@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Couple } from "../types/couples";
+import type { Family } from "../types/families";
 import type { HistoryEntry } from "../types/history";
 import {
 	loadCouples,
+	loadFamilies,
 	loadHistory,
+	loadKidsHistory,
 	loadParticipants,
 	STORAGE_KEYS,
 	saveCouples,
+	saveFamilies,
 	saveHistory,
+	saveKidsHistory,
 	saveParticipants,
 } from "./storage";
 
@@ -216,5 +221,73 @@ describe("couples", () => {
 		blockLocalStorage();
 
 		expect(saveCouples(COUPLES)).toBe(false);
+	});
+});
+
+describe("families", () => {
+	const FAMILIES: Family[] = [
+		{ parents: ["Anna", "Ben"], kids: ["Tom", "Lily"] },
+		{ parents: [], kids: ["Max"] },
+	];
+
+	it("round-trips through real localStorage", () => {
+		expect(saveFamilies(FAMILIES)).toBe(true);
+
+		expect(loadFamilies()).toEqual(FAMILIES);
+	});
+
+	it("returns no families when nothing is stored", () => {
+		expect(loadFamilies()).toEqual([]);
+	});
+
+	it.each([
+		["malformed JSON", "{{"],
+		["a non-array", JSON.stringify({ parents: [], kids: [] })],
+		["a family without kids", JSON.stringify([{ parents: ["Anna"] }])],
+		["a blank kid", JSON.stringify([{ parents: [], kids: [""] }])],
+		["a non-text parent", JSON.stringify([{ parents: [1], kids: ["Tom"] }])],
+	])("returns no families for %s", (_, raw) => {
+		localStorage.setItem(STORAGE_KEYS.families, raw);
+
+		expect(loadFamilies()).toEqual([]);
+	});
+
+	it("returns no families when localStorage throws", () => {
+		blockLocalStorage();
+
+		expect(loadFamilies()).toEqual([]);
+	});
+
+	it("reports failure instead of throwing when localStorage throws", () => {
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		blockLocalStorage();
+
+		expect(saveFamilies(FAMILIES)).toBe(false);
+	});
+});
+
+describe("kids history", () => {
+	it("round-trips separately from the adults' history", () => {
+		const kidsHistory = [{ year: 2025, giver: "Anna", receiver: "Max" }];
+
+		expect(saveKidsHistory(kidsHistory)).toBe(true);
+		saveHistory(HISTORY);
+
+		expect(loadKidsHistory()).toEqual(kidsHistory);
+		expect(loadHistory()).toEqual(HISTORY);
+	});
+
+	it("returns an empty history when nothing is stored or it is invalid", () => {
+		expect(loadKidsHistory()).toEqual([]);
+
+		localStorage.setItem(STORAGE_KEYS.kidsHistory, '[{"year":1}]');
+
+		expect(loadKidsHistory()).toEqual([]);
+	});
+
+	it("returns an empty history when localStorage throws", () => {
+		blockLocalStorage();
+
+		expect(loadKidsHistory()).toEqual([]);
 	});
 });

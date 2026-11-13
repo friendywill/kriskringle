@@ -74,14 +74,23 @@ function splitPair(text: string): Assignment | null {
  * Only names on `people` are accepted, matched ignoring case and spacing.
  * Entries come back in the list's spelling; names that are not on the list
  * are reported as errors and collected in `unknownNames`.
+ *
+ * Pass `kids` for kids' presents history: givers must then be on `people`
+ * and receivers must be kids. Unknown kids are reported but not collected
+ * in `unknownNames`, which only ever holds names for the people list.
  */
 export function parseHistory(
 	text: string,
 	people: readonly string[],
+	kids?: readonly string[],
 ): HistoryParseResult {
 	const entries: HistoryEntry[] = [];
 	const errors: HistoryParseError[] = [];
 	const listed = new Map(people.map((name) => [nameKey(name), name]));
+	const receivers =
+		kids === undefined
+			? listed
+			: new Map(kids.map((name) => [nameKey(name), name]));
 	const unknown = new Map<string, string>();
 	const seenGivers = new Set<string>();
 	let year: number | null = null;
@@ -127,19 +136,29 @@ export function parseHistory(
 			continue;
 		}
 
-		const strangers = [entry.data.giver, entry.data.receiver].filter(
-			(name) => !listed.has(nameKey(name)),
-		);
-		if (strangers.length > 0) {
-			for (const name of strangers) unknown.set(nameKey(name), name);
-			report(`Not on the people list: ${strangers.join(", ")}.`);
+		// Look names up in their lists, keeping the list's spelling so
+		// "alice" in a chat is saved as "Alice".
+		const giver = listed.get(nameKey(entry.data.giver));
+		const receiver = receivers.get(nameKey(entry.data.receiver));
+		if (giver === undefined || receiver === undefined) {
+			const notPeople = [
+				...(giver === undefined ? [entry.data.giver] : []),
+				...(receiver === undefined && kids === undefined
+					? [entry.data.receiver]
+					: []),
+			];
+			for (const name of notPeople) unknown.set(nameKey(name), name);
+			const problems = [
+				...(notPeople.length > 0
+					? [`Not on the people list: ${notPeople.join(", ")}.`]
+					: []),
+				...(receiver === undefined && kids !== undefined
+					? [`Not a kid in any family: ${entry.data.receiver}.`]
+					: []),
+			];
+			report(problems.join(" "));
 			continue;
 		}
-
-		// Keep the list's spelling, so "alice" in a chat is saved as "Alice".
-		const giver = listed.get(nameKey(entry.data.giver)) ?? entry.data.giver;
-		const receiver =
-			listed.get(nameKey(entry.data.receiver)) ?? entry.data.receiver;
 
 		const giverKey = `${year}\u0000${nameKey(giver)}`;
 		if (seenGivers.has(giverKey)) {
@@ -213,9 +232,10 @@ export function replaceYear(
 export function formatAnnouncement(
 	year: number,
 	assignments: readonly Assignment[],
+	heading = "Kris Kringle",
 ): string {
 	return [
-		`Kris Kringle ${year}`,
+		`${heading} ${year}`,
 		...assignments.map(({ giver, receiver }) => `${giver} → ${receiver}`),
 	].join("\n");
 }

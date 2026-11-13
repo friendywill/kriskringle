@@ -12,8 +12,12 @@ import {
 const PEOPLE = ["Alice", "Bob", "Carol", "Dan", "Erin"];
 
 /** Parses against the usual people list unless a test supplies its own. */
-function parse(text: string, people: readonly string[] = PEOPLE) {
-	return parseHistory(text, people);
+function parse(
+	text: string,
+	people: readonly string[] = PEOPLE,
+	kids?: readonly string[],
+) {
+	return parseHistory(text, people, kids);
 }
 
 function entry(year: number, giver: string, receiver: string): HistoryEntry {
@@ -312,6 +316,58 @@ describe("parseHistory", () => {
 			expect(entries).toEqual([]);
 			expect(errors.map((error) => error.line)).toEqual([1, 2]);
 		});
+	});
+});
+
+describe("parseHistory for kids' presents", () => {
+	const KIDS = ["Tom", "Lily", "Max"];
+
+	it("takes givers from the people list and receivers from the kids", () => {
+		expect(
+			parse("Kids 2025\nalice -> TOM\nBob has Lily", PEOPLE, KIDS),
+		).toEqual({
+			entries: [entry(2025, "Alice", "Tom"), entry(2025, "Bob", "Lily")],
+			errors: [],
+			unknownNames: [],
+		});
+	});
+
+	it("rejects an adult as a receiver", () => {
+		const { entries, errors, unknownNames } = parse(
+			"2025\nAlice -> Bob",
+			PEOPLE,
+			KIDS,
+		);
+
+		expect(entries).toEqual([]);
+		expect(errors).toMatchObject([
+			{ line: 2, message: "Not a kid in any family: Bob." },
+		]);
+		expect(unknownNames).toEqual([]);
+	});
+
+	it("collects unknown givers for the people list but not unknown kids", () => {
+		const { errors, unknownNames } = parse("2025\nZed -> Yan", PEOPLE, KIDS);
+
+		expect(errors).toMatchObject([
+			{
+				message: "Not on the people list: Zed. Not a kid in any family: Yan.",
+			},
+		]);
+		expect(unknownNames).toEqual(["Zed"]);
+	});
+
+	it("reads back its own announcement", () => {
+		const announcement = formatAnnouncement(
+			2026,
+			[{ giver: "Alice", receiver: "Max" }],
+			"Kids' presents",
+		);
+
+		expect(announcement).toBe("Kids' presents 2026\nAlice → Max");
+		expect(parse(announcement, PEOPLE, KIDS).entries).toEqual([
+			entry(2026, "Alice", "Max"),
+		]);
 	});
 });
 

@@ -1,5 +1,6 @@
 import type { ZodMiniType } from "zod/mini";
 import { type Couple, couplesSchema } from "../types/couples";
+import { type Family, familiesSchema } from "../types/families";
 import { type HistoryEntry, historySchema } from "../types/history";
 import { participantsSchema } from "../types/participants";
 
@@ -17,6 +18,8 @@ export const STORAGE_KEYS = {
 	history: "kk:v1:history",
 	participants: "kk:v1:participants",
 	couples: "kk:v1:couples",
+	families: "kk:v1:families",
+	kidsHistory: "kk:v1:kids-history",
 } as const;
 
 function read<T>(key: string, schema: ZodMiniType<T>): T | null {
@@ -72,4 +75,28 @@ export function loadCouples(): Couple[] {
 /** Replaces the stored couples. Returns whether they were saved. */
 export function saveCouples(couples: readonly Couple[]): boolean {
 	return write(STORAGE_KEYS.couples, couplesSchema, [...couples]);
+}
+
+/** Families for the kids' presents. Empty default: `[]` (no families). */
+export function loadFamilies(): Family[] {
+	return read(STORAGE_KEYS.families, familiesSchema) ?? [];
+}
+
+/** Replaces the stored families. Returns whether they were saved. */
+export function saveFamilies(families: readonly Family[]): boolean {
+	return write(STORAGE_KEYS.families, familiesSchema, [...families]);
+}
+
+/**
+ * Past kids' presents (adult gave to child), kept apart from the adults'
+ * history so neither draw's rotation affects the other.
+ * Empty default: `[]` (no history).
+ */
+export function loadKidsHistory(): HistoryEntry[] {
+	return read(STORAGE_KEYS.kidsHistory, historySchema) ?? [];
+}
+
+/** Replaces the stored kids' history. Returns whether it was saved. */
+export function saveKidsHistory(history: readonly HistoryEntry[]): boolean {
+	return write(STORAGE_KEYS.kidsHistory, historySchema, [...history]);
 }
