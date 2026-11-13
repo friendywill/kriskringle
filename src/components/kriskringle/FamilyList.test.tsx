@@ -122,9 +122,7 @@ describe("FamilyList", () => {
 
 	it("removes a family, and a family whose last child is removed", async () => {
 		const user = userEvent.setup();
-		render(
-			<Harness initial={[SMITHS, { parents: ["Cara"], kids: ["Max"] }]} />,
-		);
+		render(<Harness initial={[SMITHS, { parents: [], kids: ["Max"] }]} />);
 
 		await user.click(
 			screen.getByRole("button", { name: "Remove Family of Tom, Lily" }),
@@ -132,6 +130,61 @@ describe("FamilyList", () => {
 		await user.click(screen.getByRole("button", { name: "Remove Max" }));
 
 		expect(screen.queryByRole("list", { name: "Families" })).toBeNull();
+	});
+
+	it("adds a couple with no kids yet, then their first child", async () => {
+		const user = userEvent.setup();
+		render(<Harness />);
+
+		await user.selectOptions(
+			screen.getByLabelText("New family's parent"),
+			"Cara",
+		);
+		await user.click(screen.getByRole("button", { name: "Add family" }));
+
+		expect(
+			screen.getByRole("heading", { name: "Cara (no kids yet)" }),
+		).toBeInTheDocument();
+		expect(screen.getByText(/no kids yet. add them/i)).toBeInTheDocument();
+		expect(
+			within(screen.getByLabelText("New family's parent"))
+				.getAllByRole("option")
+				.map((option) => option.textContent),
+		).toEqual(["None yet", "Anna", "Ben", "Dev"]);
+
+		await user.selectOptions(
+			screen.getByLabelText("Add parent to Cara (no kids yet)"),
+			"Dev",
+		);
+		await user.click(
+			screen.getByRole("button", {
+				name: "Add chosen parent to Cara (no kids yet)",
+			}),
+		);
+		await user.type(
+			screen.getByLabelText("Add kids to Cara & Dev (no kids yet)"),
+			"Ivy{Enter}",
+		);
+
+		expect(chips("Kids in Family of Ivy")).toEqual(["Ivy"]);
+		expect(chips("Parents in Family of Ivy")).toEqual(["Cara", "Dev"]);
+	});
+
+	it("does not add a family with nobody in it", () => {
+		render(<Harness />);
+
+		expect(screen.getByRole("button", { name: "Add family" })).toBeDisabled();
+	});
+
+	it("keeps a family with parents when its last child is removed", async () => {
+		const user = userEvent.setup();
+		render(<Harness initial={[{ parents: ["Cara"], kids: ["Max"] }]} />);
+
+		await user.click(screen.getByRole("button", { name: "Remove Max" }));
+
+		expect(
+			screen.getByRole("heading", { name: "Cara (no kids yet)" }),
+		).toBeInTheDocument();
 	});
 
 	it("warns when the families could not be saved", async () => {

@@ -79,6 +79,11 @@ export function FamilyCard({
 
 			<div className="space-y-2">
 				<h4 className="text-sm font-semibold text-ink-muted">Kids</h4>
+				{family.kids.length === 0 && (
+					<p className="text-sm text-ink-muted">
+						No kids yet. Add them here when they arrive.
+					</p>
+				)}
 				{family.kids.length > 0 && (
 					<ul aria-label={`Kids in ${label}`} className="flex flex-wrap gap-2">
 						{family.kids.map((kid) => (

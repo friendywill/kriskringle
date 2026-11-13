@@ -6,6 +6,7 @@ import {
 	addParent,
 	allKids,
 	familyLabel,
+	parentsWithoutKids,
 	pruneParents,
 	removeFamily,
 	removeKid,
@@ -36,6 +37,26 @@ describe("addFamily", () => {
 		});
 	});
 
+	it("starts a family from a parent alone, for adults with no kids yet", () => {
+		expect(addFamily([SMITHS], "", "Erin")).toEqual({
+			families: [SMITHS, { parents: ["Erin"], kids: [] }],
+			skipped: [],
+		});
+	});
+
+	it("starts a family from a parent and kids together", () => {
+		expect(addFamily([], "Max", "Cara").families).toEqual([
+			{ parents: ["Cara"], kids: ["Max"] },
+		]);
+	});
+
+	it("does not start a second family with no kids for the same adult", () => {
+		const waiting: Family[] = [{ parents: ["Erin", "Finn"], kids: [] }];
+
+		expect(addFamily(waiting, "", "finn").families).toEqual(waiting);
+		expect(addFamily(waiting, "Ivy", "Finn").families).toHaveLength(2);
+	});
+
 	it("adds no family when no new child was given", () => {
 		expect(addFamily([SMITHS], "Tom, ")).toEqual({
 			families: [SMITHS],
@@ -64,8 +85,17 @@ describe("removeKid", () => {
 		]);
 	});
 
-	it("removes the family along with its last child", () => {
-		expect(removeKid([SMITHS, JONES], 1, "Max")).toEqual([SMITHS]);
+	it("keeps a family with parents after its last child is removed", () => {
+		expect(removeKid([SMITHS, JONES], 1, "Max")).toEqual([
+			SMITHS,
+			{ parents: ["Cara"], kids: [] },
+		]);
+	});
+
+	it("removes a family left with nobody", () => {
+		const orphans: Family[] = [{ parents: [], kids: ["Max"] }];
+
+		expect(removeKid(orphans, 0, "Max")).toEqual([]);
 	});
 });
 
@@ -100,6 +130,22 @@ describe("removeParent", () => {
 	});
 });
 
+describe("removeParent on a family with no kids", () => {
+	it("removes the family once its last parent goes", () => {
+		const waiting: Family[] = [{ parents: ["Erin"], kids: [] }];
+
+		expect(removeParent(waiting, 0, "Erin")).toEqual([]);
+	});
+});
+
+describe("parentsWithoutKids", () => {
+	it("lists adults heading a family with no kids yet", () => {
+		const waiting: Family = { parents: ["Erin", "Finn"], kids: [] };
+
+		expect(parentsWithoutKids([SMITHS, waiting])).toEqual(["Erin", "Finn"]);
+	});
+});
+
 describe("removeFamily", () => {
 	it("removes the family at the index", () => {
 		expect(removeFamily([SMITHS, JONES], 0)).toEqual([JONES]);
@@ -107,6 +153,12 @@ describe("removeFamily", () => {
 });
 
 describe("pruneParents", () => {
+	it("removes a family with no kids once all its parents have left", () => {
+		const waiting: Family = { parents: ["Erin"], kids: [] };
+
+		expect(pruneParents([SMITHS, waiting], ["Anna", "Ben"])).toEqual([SMITHS]);
+	});
+
 	it("drops parents who left the people list but keeps their kids", () => {
 		expect(pruneParents([SMITHS, JONES], ["Ben"])).toEqual([
 			{ parents: ["Ben"], kids: ["Tom", "Lily"] },
@@ -120,9 +172,13 @@ describe("familyLabel", () => {
 		expect(familyLabel(SMITHS)).toBe("Family of Tom, Lily");
 	});
 
-	it("handles a family with no kids", () => {
-		expect(familyLabel({ parents: ["Anna"], kids: [] })).toBe(
-			"Family with no kids",
+	it("names a family with no kids yet by its parents", () => {
+		expect(familyLabel({ parents: ["Erin", "Finn"], kids: [] })).toBe(
+			"Erin & Finn (no kids yet)",
 		);
+	});
+
+	it("handles an empty family", () => {
+		expect(familyLabel({ parents: [], kids: [] })).toBe("Empty family");
 	});
 });

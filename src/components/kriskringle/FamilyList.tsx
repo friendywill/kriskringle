@@ -1,5 +1,5 @@
 import { type SubmitEvent, useId, useState } from "react";
-import { addFamily } from "../../lib/families";
+import { addFamily, parentsWithoutKids } from "../../lib/families";
 import { nameKey } from "../../lib/utils";
 import type { Family } from "../../types/families";
 import { Alert } from "../ui/Alert";
@@ -15,16 +15,36 @@ type FamilyListProps = {
 	onChange: (families: Family[]) => boolean;
 };
 
+/**
+ * A child is in one family only, so the kids identify a family. A family
+ * with no kids yet is identified by its parents instead.
+ */
+function familyKey(family: Family): string {
+	return family.kids.length > 0
+		? `kids:${family.kids.map(nameKey).join("\u0000")}`
+		: `parents:${family.parents.map(nameKey).join("\u0000")}`;
+}
+
 export function FamilyList({
 	participants,
 	families,
 	onChange,
 }: FamilyListProps) {
 	const [draft, setDraft] = useState("");
+	const [parentChoice, setParentChoice] = useState("");
 	const [skipped, setSkipped] = useState<string[]>([]);
 	const [hasSaveError, setHasSaveError] = useState(false);
-	const inputId = useId();
+	const kidsId = useId();
+	const parentId = useId();
 	const hintId = useId();
+
+	// Someone who already heads a family with no kids yet adds kids to that
+	// family instead of starting another.
+	const waiting = new Set(parentsWithoutKids(families).map(nameKey));
+	const parentOptions = participants.filter(
+		(name) => !waiting.has(nameKey(name)),
+	);
+	const parent = parentOptions.includes(parentChoice) ? parentChoice : "";
 
 	const commit = (next: Family[]) => {
 		setHasSaveError(!onChange(next));
@@ -32,10 +52,12 @@ export function FamilyList({
 
 	const handleAddFamily = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
-		const result = addFamily(families, draft);
+		const result = addFamily(families, draft, parent);
 		setSkipped(result.skipped);
+		if (result.families.length === families.length) return;
 		setDraft("");
-		if (result.families.length > families.length) commit(result.families);
+		setParentChoice("");
+		commit(result.families);
 	};
 
 	return (
@@ -51,8 +73,7 @@ export function FamilyList({
 				<ul aria-label="Families" className="space-y-4">
 					{families.map((family, index) => (
 						<FamilyCard
-							// A child is in one family only, so the kids identify it.
-							key={family.kids.map(nameKey).join("\u0000")}
+							key={familyKey(family)}
 							families={families}
 							index={index}
 							participants={participants}
@@ -62,13 +83,35 @@ export function FamilyList({
 				</ul>
 			)}
 
-			<form onSubmit={handleAddFamily} className="flex items-end gap-2">
-				<div className="flex-1">
-					<label htmlFor={inputId} className={labelClass}>
+			<form
+				onSubmit={handleAddFamily}
+				className="grid gap-4 border-t border-line pt-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+			>
+				<div>
+					<label htmlFor={parentId} className={labelClass}>
+						New family's parent
+					</label>
+					<select
+						id={parentId}
+						value={parent}
+						onChange={(event) => setParentChoice(event.target.value)}
+						aria-describedby={hintId}
+						className={controlClass}
+					>
+						<option value="">None yet</option>
+						{parentOptions.map((name) => (
+							<option key={name} value={name}>
+								{name}
+							</option>
+						))}
+					</select>
+				</div>
+				<div>
+					<label htmlFor={kidsId} className={labelClass}>
 						New family's kids
 					</label>
 					<input
-						id={inputId}
+						id={kidsId}
 						type="text"
 						value={draft}
 						onChange={(event) => setDraft(event.target.value)}
@@ -77,10 +120,13 @@ export function FamilyList({
 						className={controlClass}
 					/>
 				</div>
-				<Button type="submit">Add family</Button>
+				<Button type="submit" disabled={parent === "" && draft.trim() === ""}>
+					Add family
+				</Button>
 			</form>
 			<p id={hintId} className="text-sm text-ink-muted">
-				Separate several kids with commas, then add their parents.
+				Give a parent, the kids, or both; separate several kids with commas. A
+				couple with no kids yet can be added now and their kids later.
 			</p>
 			{skipped.length > 0 && (
 				<Alert tone="info">
