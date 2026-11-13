@@ -43,11 +43,15 @@ export type KidsDrawInput = {
 };
 
 export type KidsDrawResult =
-	| { ok: true; assignments: Assignment[] }
-	| { ok: false; reason: "no-kids" | "no-adults" }
 	| {
-			ok: false;
-			reason: "kids-without-giver";
-			/** Children every adult is a parent of, so nobody may buy for. */
-			kids: string[];
-	  };
+			ok: true;
+			/** One child per adult, never the adult's own child. */
+			assignments: Assignment[];
+			/** Children nobody could be given: too few adults, or only parents. */
+			kidsWithoutPresent: string[];
+			/** Adults with no child outside their own family to buy for. */
+			adultsWithoutKid: string[];
+			/** Assignments repeating an earlier year; only made when unavoidable. */
+			repeats: Assignment[];
+	  }
+	| { ok: false; reason: "no-kids" | "no-adults" };
