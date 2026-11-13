@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Couple } from "../types/couples";
 import type { Assignment, KidsDrawInput } from "../types/draw";
 import type { Family } from "../types/families";
 import type { HistoryEntry } from "../types/history";
@@ -18,6 +19,7 @@ function draw(
 	return drawKids({
 		adults: options.adults ?? ADULTS,
 		families: options.families ?? [SMITHS, JONES],
+		couples: options.couples ?? [],
 		history: options.history ?? [],
 		year: options.year ?? 2026,
 		rng: createRng(options.seed ?? 1),
@@ -146,6 +148,98 @@ describe("drawKids", () => {
 
 		expect(pairs(result.assignments)).toEqual(["Cara>Tom"]);
 		expect(result.adultsWithoutKid).toEqual(["Anna", "Ben"]);
+	});
+
+	describe("couples", () => {
+		it("never gives partners the same child", () => {
+			// Erin and Finn may only buy for the Smith kids, two of them.
+			const adults = ["Anna", "Ben", "Cara", "Dev", "Erin", "Finn"];
+			const couples: Couple[] = [["Erin", "Finn"]];
+			const families: Family[] = [
+				SMITHS,
+				{ parents: ["Cara", "Dev", "Erin", "Finn"], kids: ["Max"] },
+			];
+
+			for (const seed of SEEDS) {
+				const result = success(draw({ adults, families, couples, seed }));
+				const erin = result.assignments.find((a) => a.giver === "Erin");
+				const finn = result.assignments.find((a) => a.giver === "Finn");
+				expect(erin?.receiver).toBeDefined();
+				expect(erin?.receiver).not.toBe(finn?.receiver);
+			}
+		});
+
+		it("keeps every couple on different kids in a larger draw", () => {
+			const couples: Couple[] = [
+				["Anna", "Ben"],
+				["Cara", "Dev"],
+				["Erin", "Finn"],
+			];
+			const families: Family[] = [
+				{ parents: ["Anna", "Ben"], kids: ["Tom", "Lily"] },
+				{ parents: ["Cara", "Dev"], kids: ["Max", "Zoe"] },
+				{ parents: [], kids: ["Ivy"] },
+			];
+			const adults = ["Anna", "Ben", "Cara", "Dev", "Erin", "Finn", "Gus"];
+
+			for (const seed of SEEDS) {
+				const kidOf = new Map(
+					success(draw({ adults, families, couples, seed })).assignments.map(
+						(a) => [a.giver, a.receiver],
+					),
+				);
+				expect(kidOf.size).toBe(7);
+				for (const [first, second] of couples) {
+					expect(kidOf.get(first)).not.toBe(kidOf.get(second));
+				}
+			}
+		});
+
+		it("leaves a partner out rather than share a child", () => {
+			const families: Family[] = [{ parents: [], kids: ["Tom"] }];
+
+			const result = success(
+				draw({
+					adults: ["Erin", "Finn"],
+					families,
+					couples: [["Erin", "Finn"]],
+				}),
+			);
+
+			expect(result.assignments).toHaveLength(1);
+			expect(result.adultsWithoutKid).toHaveLength(1);
+		});
+
+		it("matches partners ignoring case and spacing", () => {
+			const families: Family[] = [{ parents: [], kids: ["Tom"] }];
+
+			const result = success(
+				draw({
+					adults: ["Erin", "Finn"],
+					families,
+					couples: [[" erin", "FINN "]],
+				}),
+			);
+
+			expect(result.assignments).toHaveLength(1);
+		});
+
+		it("still lets partners share a child's family", () => {
+			const families: Family[] = [{ parents: [], kids: ["Tom", "Lily"] }];
+
+			const result = success(
+				draw({
+					adults: ["Erin", "Finn"],
+					families,
+					couples: [["Erin", "Finn"]],
+				}),
+			);
+
+			expect(result.assignments.map((a) => a.receiver).sort()).toEqual([
+				"Lily",
+				"Tom",
+			]);
+		});
 	});
 
 	describe("past years", () => {

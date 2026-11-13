@@ -35,6 +35,8 @@ export type KidsDrawInput = {
 	/** Everyone on the people list. Each buys for a child where they can. */
 	adults: readonly string[];
 	families: readonly Family[];
+	/** Partners never buy for the same child. */
+	couples: readonly Couple[];
 	/** Past kids' presents: adult gave to child. */
 	history: readonly HistoryEntry[];
 	/** The year being drawn. Only earlier years count as "bought before". */

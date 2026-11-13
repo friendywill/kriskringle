@@ -30,6 +30,7 @@ function renderPanel(props: PanelProps = {}) {
 		<KidsPanel
 			participants={ADULTS}
 			families={FAMILIES}
+			couples={[]}
 			history={[]}
 			onFamiliesChange={onFamiliesChange}
 			onSaveDraw={onSaveDraw}
@@ -136,7 +137,7 @@ describe("KidsPanel", () => {
 			),
 		).toBeInTheDocument();
 		expect(
-			screen.getByText(/anna and ben have no child outside/i),
+			screen.getByText(/anna and ben have no child to buy for/i),
 		).toBeInTheDocument();
 		expect(screen.queryByRole("table")).not.toBeInTheDocument();
 	});
@@ -152,6 +153,21 @@ describe("KidsPanel", () => {
 		await user.click(screen.getByRole("button", { name: "Draw kids" }));
 
 		expect(screen.getByText(/couldn't avoid/i)).toHaveTextContent("Erin (Tom)");
+	});
+
+	it("never gives partners the same child", async () => {
+		const { user } = renderPanel({
+			participants: ["Erin", "Finn"],
+			families: [{ parents: [], kids: ["Tom", "Lily"] }],
+			couples: [["Erin", "Finn"]],
+		});
+
+		await user.click(screen.getByRole("button", { name: "Draw kids" }));
+		for (let attempt = 0; attempt < 10; attempt++) {
+			const kids = drawnPairs().map((pair) => pair.split(">")[1]);
+			expect(kids.sort()).toEqual(["Lily", "Tom"]);
+			await user.click(screen.getByRole("button", { name: "Draw again" }));
+		}
 	});
 
 	it("asks for families before drawing", async () => {

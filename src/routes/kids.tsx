@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { KidsPanel } from "../components/kriskringle/KidsPanel";
 import { replaceYear } from "../lib/history";
 import {
+	loadCouples,
 	loadFamilies,
 	loadKidsHistory,
 	loadParticipants,
@@ -15,13 +16,14 @@ export const Route = createFileRoute("/kids")({
 	loader: () => ({
 		participants: loadParticipants(),
 		families: loadFamilies(),
+		couples: loadCouples(),
 		history: loadKidsHistory(),
 	}),
 	component: KidsRoute,
 });
 
 function KidsRoute() {
-	const { participants, families, history } = Route.useLoaderData();
+	const { participants, families, couples, history } = Route.useLoaderData();
 	const router = useRouter();
 
 	const handleFamiliesChange = (next: Family[]) => {
@@ -40,6 +42,7 @@ function KidsRoute() {
 		<KidsPanel
 			participants={participants}
 			families={families}
+			couples={couples}
 			history={history}
 			onFamiliesChange={handleFamiliesChange}
 			onSaveDraw={handleSaveDraw}

@@ -1,6 +1,7 @@
 import { type SubmitEvent, useId, useState } from "react";
 import { drawKids } from "../../lib/kidsDraw";
 import { createRng } from "../../lib/utils";
+import type { Couple } from "../../types/couples";
 import type { Assignment, KidsDrawResult } from "../../types/draw";
 import type { Family } from "../../types/families";
 import {
@@ -19,6 +20,8 @@ import { FamilyList } from "./FamilyList";
 type KidsPanelProps = {
 	participants: readonly string[];
 	families: readonly Family[];
+	/** Partners never buy for the same child. */
+	couples: readonly Couple[];
 	history: readonly HistoryEntry[];
 	/** Persists the families and returns whether they were saved. */
 	onFamiliesChange: (families: Family[]) => boolean;
@@ -45,6 +48,7 @@ function sentenceList(names: readonly string[]): string {
 export function KidsPanel({
 	participants,
 	families,
+	couples,
 	history,
 	onFamiliesChange,
 	onSaveDraw,
@@ -73,6 +77,7 @@ export function KidsPanel({
 			outcome: drawKids({
 				adults: participants,
 				families,
+				couples,
 				history,
 				year: year.data,
 				rng: createRng(seed),
@@ -87,7 +92,8 @@ export function KidsPanel({
 			<h1 className="text-2xl font-bold tracking-tight">Kids' presents</h1>
 			<p className="text-ink-muted">
 				Every adult on the people list buys for one child from another family,
-				and preferably not a child they've bought for before.
+				including adults with no kids yet. Couples buy for different kids, and
+				preferably not a child they've bought for before.
 			</p>
 
 			<Card title="Families">
@@ -139,8 +145,8 @@ export function KidsPanel({
 				{outcome?.ok && outcome.adultsWithoutKid.length > 0 && (
 					<Alert tone="info">
 						{sentenceList(outcome.adultsWithoutKid)}{" "}
-						{outcome.adultsWithoutKid.length === 1 ? "has" : "have"} no child
-						outside their own family to buy for.
+						{outcome.adultsWithoutKid.length === 1 ? "has" : "have"} no child to
+						buy for: the only kids left are their own, or their partner's pick.
 					</Alert>
 				)}
 				{outcome?.ok && outcome.repeats.length > 0 && (
