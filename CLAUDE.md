@@ -263,9 +263,9 @@ the user/caller needs?" not "does this call this internal function?"
 ### Commands
 
 ```bash
-bun test          # run unit + component tests (watch mode)
-bun test:run      # single run (CI)
-bun test:coverage # coverage report
+bun run test          # run unit + component tests (watch mode)
+bun run test:run      # single run (CI)
+bun run test:coverage # coverage report
 ```
 
 ---
