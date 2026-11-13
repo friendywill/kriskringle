@@ -249,3 +249,21 @@ child`)
 - Production build in headless Edge: a kidless couple saved and reloaded;
   40 draws always placed both partners and never gave them the same child;
   kids added later joined the waiting family; no console errors.
+
+## 2026-11-14 — Session 1, prompt 5
+
+### Prompt
+
+> fix the open issues
+
+### Response
+
+- `fix(history): wrap long pasted lines in errors`: `wrap-break-words` in
+  `HistoryEditor` produced no CSS; changed to `wrap-break-word`
+  (`overflow-wrap: break-word`), confirmed in the built stylesheet.
+- `docs: use bun run for test commands`: `CLAUDE.md` now lists
+  `bun run test`, `bun run test:run` and `bun run test:coverage`, since
+  `bun test` runs Bun's own runner instead of Vitest.
+- Removed the leftover temp folder `tmp.QZh1siCVTT` (held one stray
+  `tsconfig.json`).
+- 296 tests pass; lint and build clean.
