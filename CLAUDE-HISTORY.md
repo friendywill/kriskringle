@@ -209,3 +209,43 @@ Built on branch `feat/kids-presents` (from `master`), in four commits.
   same child. Easy to prevent if wanted.
 - Every adult buys for a child. If some adults should sit the kids' draw
   out, that needs an opt-out per person.
+
+## 2026-11-14 — Session 1, prompt 4
+
+### Prompt
+
+> stop couples from drawing the same child, then ensure we can add adults who
+> yet to have kids
+
+### Response
+
+Two commits on `feat/kids-presents`.
+
+**Couples never share a child** (`feat(kids): never give partners the same
+child`)
+
+- The kids' draw now takes the couples list. Partners count as one
+  household, and each household can give a given child at most one present,
+  so two partners always buy for different kids.
+- Coverage and evenness still hold: every child still gets a present when
+  enough adults allow it, and presents stay as evenly spread as possible.
+- When a partner can't be placed because the only kids left are their own
+  or their partner's pick, the page names them.
+
+**Adults with no kids yet** (`feat(kids): allow families with no kids yet`)
+
+- Adults without kids were already in the kids' draw as givers. Now they
+  can also be recorded as a family that has no kids yet: the new family form
+  takes a parent, kids, or both.
+- A kidless family shows as "Erin & Finn (no kids yet)"; kids added later
+  join that family, and from then on the parents never draw them.
+- Removing the last child keeps the family while it has parents; a family is
+  only removed once it has nobody left. An adult can head only one kidless
+  family.
+
+**Verification**
+
+- 296 tests pass; lint, typecheck and build clean.
+- Production build in headless Edge: a kidless couple saved and reloaded;
+  40 draws always placed both partners and never gave them the same child;
+  kids added later joined the waiting family; no console errors.
