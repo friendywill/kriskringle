@@ -121,7 +121,7 @@ export function HistoryEditor({
 							{errors.map((error) => (
 								<li key={error.line}>
 									Line {error.line}:{" "}
-									<q className="font-mono wrap-break-words">{error.text}</q> —{" "}
+									<q className="font-mono wrap-break-word">{error.text}</q> —{" "}
 									{error.message}
 								</li>
 							))}
