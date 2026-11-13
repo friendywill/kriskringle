@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+	<title>Kris Kringle</title>
+	<rect x="4" y="13" width="24" height="15" rx="2" fill="#1d6a45" />
+	<rect x="2" y="9" width="28" height="6" rx="2" fill="#237a50" />
+	<rect x="14" y="9" width="4" height="19" fill="#c8352c" />
+	<path
+		d="M16 9c-2-5-8-6-8-2s6 2 8 2zm0 0c2-5 8-6 8-2s-6 2-8 2z"
+		fill="#c8352c"
+	/>
+</svg>

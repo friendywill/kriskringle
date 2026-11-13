@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Build and test output
+dist/
+coverage/
+
+# TanStack Router plugin scratch space
+.tanstack/
+
+# Environment — never commit real values
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+*.local
+.DS_Store
+Thumbs.db

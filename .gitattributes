@@ -1,0 +1,3 @@
+# Check out LF on every platform. Biome formats to LF and the Docker build
+# runs on Linux, so CRLF checkouts (Windows autocrlf) would fail the lint.
+* text=auto eol=lf

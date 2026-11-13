@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Defined once here as custom properties, then exposed to
+ * Tailwind below — components use the utilities (bg-surface, text-ink…),
+ * never raw colour values.
+ *
+ * Dark mode follows the OS via prefers-color-scheme, which is also what
+ * Tailwind's `dark:` variant uses by default. Every text/background pair
+ * meets WCAG AA; control borders (line-strong) meet 3:1.
+ */
+:root {
+	color-scheme: light dark;
+
+	--kk-canvas: #f7f5ef;
+	--kk-surface: #ffffff;
+	--kk-ink: #1b2420;
+	--kk-ink-muted: #56625c;
+	--kk-line: #d8d4c8;
+	--kk-line-strong: #76837c;
+	--kk-brand: #1d6a45;
+	--kk-brand-strong: #164f34;
+	--kk-on-brand: #ffffff;
+	--kk-danger: #b3261e;
+	--kk-danger-surface: #fcebe9;
+	--kk-success-surface: #e6f4ec;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--kk-canvas: #111714;
+		--kk-surface: #1a221e;
+		--kk-ink: #ecf0ed;
+		--kk-ink-muted: #a5b1ab;
+		--kk-line: #34423b;
+		--kk-line-strong: #7f8d86;
+		--kk-brand: #74d3a0;
+		--kk-brand-strong: #93dfb5;
+		--kk-on-brand: #0c1a12;
+		--kk-danger: #ff9388;
+		--kk-danger-surface: #3b1b18;
+		--kk-success-surface: #17362a;
+	}
+}
+
+@theme inline {
+	/* Drop Tailwind's stock palette so only the tokens above are usable. */
+	--color-*: initial;
+
+	--color-canvas: var(--kk-canvas);
+	--color-surface: var(--kk-surface);
+	--color-ink: var(--kk-ink);
+	--color-ink-muted: var(--kk-ink-muted);
+	--color-line: var(--kk-line);
+	--color-line-strong: var(--kk-line-strong);
+	--color-brand: var(--kk-brand);
+	--color-brand-strong: var(--kk-brand-strong);
+	--color-on-brand: var(--kk-on-brand);
+	--color-danger: var(--kk-danger);
+	--color-danger-surface: var(--kk-danger-surface);
+	--color-success-surface: var(--kk-success-surface);
+
+	/* System fonts only: nothing to download, nothing to block render. */
+	--font-sans:
+		ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--font-mono:
+		ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
