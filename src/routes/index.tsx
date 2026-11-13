@@ -1,28 +1,41 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { DrawPanel } from "../components/kriskringle/DrawPanel";
+import { pruneCouples } from "../lib/couples";
 import { replaceYear } from "../lib/history";
 import {
+	loadCouples,
 	loadHistory,
 	loadParticipants,
+	saveCouples,
 	saveHistory,
 	saveParticipants,
 } from "../lib/storage";
+import type { Couple } from "../types/couples";
 import type { Assignment } from "../types/draw";
 
 export const Route = createFileRoute("/")({
 	loader: () => ({
 		participants: loadParticipants(),
 		history: loadHistory(),
+		couples: loadCouples(),
 	}),
 	component: DrawRoute,
 });
 
 function DrawRoute() {
-	const { participants, history } = Route.useLoaderData();
+	const { participants, history, couples } = Route.useLoaderData();
 	const router = useRouter();
 
 	const handleParticipantsChange = (next: string[]) => {
-		const isSaved = saveParticipants(next);
+		// Someone leaving the list ends their couple as well.
+		const isSaved =
+			saveParticipants(next) && saveCouples(pruneCouples(couples, next));
+		void router.invalidate();
+		return isSaved;
+	};
+
+	const handleCouplesChange = (next: Couple[]) => {
+		const isSaved = saveCouples(next);
 		void router.invalidate();
 		return isSaved;
 	};
@@ -37,7 +50,9 @@ function DrawRoute() {
 		<DrawPanel
 			participants={participants}
 			history={history}
+			couples={couples}
 			onParticipantsChange={handleParticipantsChange}
+			onCouplesChange={handleCouplesChange}
 			onSaveDraw={handleSaveDraw}
 		/>
 	);

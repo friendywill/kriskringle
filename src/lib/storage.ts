@@ -1,4 +1,5 @@
 import type { ZodMiniType } from "zod/mini";
+import { type Couple, couplesSchema } from "../types/couples";
 import { type HistoryEntry, historySchema } from "../types/history";
 import { participantsSchema } from "../types/participants";
 
@@ -15,6 +16,7 @@ import { participantsSchema } from "../types/participants";
 export const STORAGE_KEYS = {
 	history: "kk:v1:history",
 	participants: "kk:v1:participants",
+	couples: "kk:v1:couples",
 } as const;
 
 function read<T>(key: string, schema: ZodMiniType<T>): T | null {
@@ -60,4 +62,14 @@ export function saveParticipants(participants: readonly string[]): boolean {
 	return write(STORAGE_KEYS.participants, participantsSchema, [
 		...participants,
 	]);
+}
+
+/** Couples who never draw each other. Empty default: `[]` (no couples). */
+export function loadCouples(): Couple[] {
+	return read(STORAGE_KEYS.couples, couplesSchema) ?? [];
+}
+
+/** Replaces the stored couples. Returns whether they were saved. */
+export function saveCouples(couples: readonly Couple[]): boolean {
+	return write(STORAGE_KEYS.couples, couplesSchema, [...couples]);
 }

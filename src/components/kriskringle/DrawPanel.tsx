@@ -2,6 +2,7 @@ import { type SubmitEvent, useId, useState } from "react";
 import { drawAssignments } from "../../lib/draw";
 import { groupByYear } from "../../lib/history";
 import { createRng } from "../../lib/utils";
+import type { Couple } from "../../types/couples";
 import type {
 	Assignment,
 	DrawFailureReason,
@@ -17,14 +18,18 @@ import { Alert } from "../ui/Alert";
 import { Button } from "../ui/Button";
 import { Card } from "../ui/Card";
 import { controlClass, labelClass } from "../ui/controlClass";
+import { CoupleList } from "./CoupleList";
 import { DrawResult } from "./DrawResult";
 import { ParticipantList } from "./ParticipantList";
 
 type DrawPanelProps = {
 	participants: readonly string[];
 	history: readonly HistoryEntry[];
+	couples: readonly Couple[];
 	/** Persists the participant list and returns whether it was saved. */
 	onParticipantsChange: (participants: string[]) => boolean;
+	/** Persists the couples and returns whether they were saved. */
+	onCouplesChange: (couples: Couple[]) => boolean;
 	/** Saves a draw to history and returns whether it was saved. */
 	onSaveDraw: (year: number, assignments: readonly Assignment[]) => boolean;
 };
@@ -52,7 +57,7 @@ const FAILURE_MESSAGES: Record<DrawFailureReason, string> = {
 	"duplicate-participants":
 		"Someone is on the list twice. Remove the duplicate and draw again.",
 	"no-valid-pairing":
-		"There's no way to pair everyone without repeating a past pairing. Avoid fewer years of history, or add more people.",
+		"There's no way to pair everyone without repeating a past pairing or pairing a couple. Avoid fewer years of history, or add more people.",
 };
 
 function describeHistory(history: readonly HistoryEntry[]): string {
@@ -66,7 +71,9 @@ function describeHistory(history: readonly HistoryEntry[]): string {
 export function DrawPanel({
 	participants,
 	history,
+	couples,
 	onParticipantsChange,
+	onCouplesChange,
 	onSaveDraw,
 }: DrawPanelProps) {
 	const [yearText, setYearText] = useState(() =>
@@ -83,6 +90,12 @@ export function DrawPanel({
 		return onParticipantsChange(next);
 	};
 
+	const handleCouplesChange = (next: Couple[]) => {
+		// Nor does a draw made under the old couples.
+		setDraw(null);
+		return onCouplesChange(next);
+	};
+
 	const handleDraw = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const year = yearSchema.safeParse(Number(yearText));
@@ -97,6 +110,7 @@ export function DrawPanel({
 			outcome: drawAssignments({
 				participants,
 				history,
+				couples,
 				year: year.data,
 				lookbackYears: lookback === ALL_YEARS ? null : Number(lookback),
 				rng: createRng(seed),
@@ -112,6 +126,14 @@ export function DrawPanel({
 				<ParticipantList
 					participants={participants}
 					onChange={handleParticipantsChange}
+				/>
+			</Card>
+
+			<Card title="Couples">
+				<CoupleList
+					participants={participants}
+					couples={couples}
+					onChange={handleCouplesChange}
 				/>
 			</Card>
 

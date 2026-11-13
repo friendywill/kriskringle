@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Couple } from "../types/couples";
 import type { HistoryEntry } from "../types/history";
 import {
+	loadCouples,
 	loadHistory,
 	loadParticipants,
 	STORAGE_KEYS,
+	saveCouples,
 	saveHistory,
 	saveParticipants,
 } from "./storage";
@@ -162,5 +165,56 @@ describe("participants", () => {
 
 		expect(loadParticipants()).toEqual(["Alice"]);
 		expect(loadHistory()).toEqual(HISTORY);
+	});
+});
+
+describe("couples", () => {
+	const COUPLES: Couple[] = [
+		["Alice", "Bob"],
+		["Carol", "Dan"],
+	];
+
+	it("round-trips through real localStorage", () => {
+		expect(saveCouples(COUPLES)).toBe(true);
+
+		expect(loadCouples()).toEqual(COUPLES);
+		expect(localStorage.getItem(STORAGE_KEYS.couples)).toBe(
+			JSON.stringify(COUPLES),
+		);
+	});
+
+	it("returns no couples when nothing is stored", () => {
+		expect(loadCouples()).toEqual([]);
+	});
+
+	it("returns no couples for malformed JSON", () => {
+		localStorage.setItem(STORAGE_KEYS.couples, "[[");
+
+		expect(loadCouples()).toEqual([]);
+	});
+
+	it.each([
+		["a non-array", { first: "Alice", second: "Bob" }],
+		["a couple of one", [["Alice"]]],
+		["a couple of three", [["Alice", "Bob", "Carol"]]],
+		["a blank partner", [["Alice", " "]]],
+		["non-text partners", [["Alice", 7]]],
+	])("returns no couples for %s", (_, stored) => {
+		localStorage.setItem(STORAGE_KEYS.couples, JSON.stringify(stored));
+
+		expect(loadCouples()).toEqual([]);
+	});
+
+	it("returns no couples when localStorage throws", () => {
+		blockLocalStorage();
+
+		expect(loadCouples()).toEqual([]);
+	});
+
+	it("reports failure instead of throwing when localStorage throws", () => {
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		blockLocalStorage();
+
+		expect(saveCouples(COUPLES)).toBe(false);
 	});
 });

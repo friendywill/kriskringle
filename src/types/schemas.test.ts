@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { couplesSchema } from "./couples";
 import { historyEntrySchema, historySchema, yearSchema } from "./history";
 import { nameSchema, participantsSchema } from "./participants";
 
@@ -71,5 +72,23 @@ describe("historySchema", () => {
 		];
 
 		expect(historySchema.safeParse(stored).success).toBe(false);
+	});
+});
+
+describe("couplesSchema", () => {
+	it("accepts pairs of names, trimming each", () => {
+		expect(couplesSchema.parse([[" Alice ", "Bob"]])).toEqual([
+			["Alice", "Bob"],
+		]);
+		expect(couplesSchema.parse([])).toEqual([]);
+	});
+
+	it.each([
+		["one partner", [["Alice"]]],
+		["three partners", [["Alice", "Bob", "Carol"]]],
+		["a blank partner", [["Alice", ""]]],
+		["an object instead of a pair", [{ first: "Alice", second: "Bob" }]],
+	])("rejects a couple with %s", (_, value) => {
+		expect(couplesSchema.safeParse(value).success).toBe(false);
 	});
 });

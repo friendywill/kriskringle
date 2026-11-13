@@ -1,3 +1,4 @@
+import type { Couple } from "../types/couples";
 import type {
 	Assignment,
 	DrawFailureReason,
@@ -20,18 +21,27 @@ function fail(reason: DrawFailureReason): DrawResult {
  * The year being drawn is ignored so it can be re-drawn after saving, and
  * `lookbackYears` limits how far back the rule reaches.
  */
-function blockedPairs(
+function repeatedPairs(
 	history: readonly HistoryEntry[],
 	year: number,
 	lookbackYears: number | null,
-): Set<string> {
+): string[] {
 	const earliest =
 		lookbackYears === null ? Number.NEGATIVE_INFINITY : year - lookbackYears;
-	return new Set(
-		history
-			.filter((entry) => entry.year < year && entry.year >= earliest)
-			.map((entry) => pairKey(entry.giver, entry.receiver)),
-	);
+	return history
+		.filter((entry) => entry.year < year && entry.year >= earliest)
+		.map((entry) => pairKey(entry.giver, entry.receiver));
+}
+
+/**
+ * The couples rule: partners already buy for each other, so neither may
+ * draw the other. Unlike the rotation rule this is never relaxed.
+ */
+function couplePairs(couples: readonly Couple[]): string[] {
+	return couples.flatMap(([first, second]) => [
+		pairKey(first, second),
+		pairKey(second, first),
+	]);
 }
 
 /**
@@ -66,8 +76,9 @@ function matchGivers(
 }
 
 /**
- * Draws who gives to whom. Nobody draws themselves, everybody gives and
- * receives exactly once, and no pairing from the checked history repeats.
+ * Draws who gives to whom. Nobody draws themselves or their partner,
+ * everybody gives and receives exactly once, and no pairing from the checked
+ * history repeats.
  *
  * Pure and deterministic: the same input and RNG sequence always produce the
  * same result. Returns a failure rather than throwing when the rules cannot
@@ -76,6 +87,7 @@ function matchGivers(
 export function drawAssignments({
 	participants,
 	history,
+	couples,
 	year,
 	lookbackYears,
 	rng,
@@ -85,7 +97,10 @@ export function drawAssignments({
 	const keys = new Set(participants.map(nameKey));
 	if (keys.size !== participants.length) return fail("duplicate-participants");
 
-	const blocked = blockedPairs(history, year, lookbackYears);
+	const blocked = new Set([
+		...repeatedPairs(history, year, lookbackYears),
+		...couplePairs(couples),
+	]);
 	const allowed = new Map(
 		participants.map((giver): [string, string[]] => {
 			const receivers = participants.filter(

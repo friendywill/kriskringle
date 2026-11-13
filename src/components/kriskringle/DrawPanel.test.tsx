@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import type { Couple } from "../../types/couples";
 import type { HistoryEntry } from "../../types/history";
 import { DrawPanel } from "./DrawPanel";
 
@@ -23,16 +24,24 @@ type PanelProps = Partial<Parameters<typeof DrawPanel>[0]>;
 function renderPanel(props: PanelProps = {}) {
 	const onSaveDraw = vi.fn(() => true);
 	const onParticipantsChange = vi.fn(() => true);
+	const onCouplesChange = vi.fn(() => true);
 	render(
 		<DrawPanel
 			participants={TRIO}
 			history={[]}
+			couples={[]}
 			onParticipantsChange={onParticipantsChange}
+			onCouplesChange={onCouplesChange}
 			onSaveDraw={onSaveDraw}
 			{...props}
 		/>,
 	);
-	return { onSaveDraw, onParticipantsChange, user: userEvent.setup() };
+	return {
+		onSaveDraw,
+		onParticipantsChange,
+		onCouplesChange,
+		user: userEvent.setup(),
+	};
 }
 
 async function setYear(user: ReturnType<typeof userEvent.setup>, year: string) {
@@ -176,6 +185,54 @@ describe("DrawPanel", () => {
 			"Bob",
 		]);
 		expect(screen.queryByRole("table")).not.toBeInTheDocument();
+	});
+
+	describe("couples", () => {
+		const FOUR = ["Alice", "Bob", "Carol", "Dan"];
+		const COUPLES: Couple[] = [
+			["Alice", "Bob"],
+			["Carol", "Dan"],
+		];
+
+		it("never draws partners for each other", async () => {
+			const { user } = renderPanel({ participants: FOUR, couples: COUPLES });
+			const forbidden = ["Alice>Bob", "Bob>Alice", "Carol>Dan", "Dan>Carol"];
+
+			await user.click(screen.getByRole("button", { name: "Draw names" }));
+			for (let attempt = 0; attempt < 15; attempt++) {
+				expect(drawnPairs()).toHaveLength(4);
+				expect(drawnPairs().filter((pair) => forbidden.includes(pair))).toEqual(
+					[],
+				);
+				await user.click(screen.getByRole("button", { name: "Draw again" }));
+			}
+		});
+
+		it("explains when a couple makes the draw impossible", async () => {
+			const { user } = renderPanel({ couples: [["Alice", "Bob"]] });
+
+			await user.click(screen.getByRole("button", { name: "Draw names" }));
+
+			expect(screen.getByRole("alert")).toHaveTextContent(/pairing a couple/i);
+			expect(screen.queryByRole("table")).not.toBeInTheDocument();
+		});
+
+		it("clears a draw once the couples change", async () => {
+			const { user, onCouplesChange } = renderPanel({
+				participants: FOUR,
+				couples: COUPLES,
+			});
+			await user.click(screen.getByRole("button", { name: "Draw names" }));
+
+			await user.click(
+				screen.getByRole("button", { name: "Remove couple Alice and Bob" }),
+			);
+
+			expect(onCouplesChange).toHaveBeenCalledExactlyOnceWith([
+				["Carol", "Dan"],
+			]);
+			expect(screen.queryByRole("table")).not.toBeInTheDocument();
+		});
 	});
 
 	it("does not draw for a year outside the supported range", async () => {

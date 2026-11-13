@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Couple } from "../types/couples";
 import type { Assignment, DrawInput } from "../types/draw";
 import type { HistoryEntry } from "../types/history";
 import { drawAssignments } from "./draw";
@@ -15,6 +16,7 @@ function draw(
 	return drawAssignments({
 		participants,
 		history: options.history ?? [],
+		couples: options.couples ?? [],
 		year: options.year ?? 2026,
 		lookbackYears: options.lookbackYears ?? null,
 		rng: createRng(options.seed ?? 1),
@@ -204,6 +206,90 @@ describe("drawAssignments", () => {
 			];
 
 			expect(draw(["Alice", "Bob"], { history: strangers }).ok).toBe(true);
+		});
+	});
+
+	describe("couples rule", () => {
+		const people = ["Alice", "Bob", "Carol", "Dan", "Erin", "Frank"];
+		const couples: Couple[] = [
+			["Alice", "Bob"],
+			["Carol", "Dan"],
+		];
+
+		it("never has partners draw each other, in either direction", () => {
+			const forbidden = new Set([
+				"Alice>Bob",
+				"Bob>Alice",
+				"Carol>Dan",
+				"Dan>Carol",
+			]);
+
+			for (const seed of SEEDS) {
+				const drawn = pairs(assignmentsOf(draw(people, { couples, seed })));
+				expect(drawn.filter((pair) => forbidden.has(pair))).toEqual([]);
+				expect(drawn).toHaveLength(people.length);
+			}
+		});
+
+		it("treats names that differ only by case or spacing as one person", () => {
+			const messy: Couple[] = [[" ALICE", "bob "]];
+
+			expect(draw(["Alice", "Bob"], { couples: messy })).toEqual({
+				ok: false,
+				reason: "no-valid-pairing",
+			});
+		});
+
+		it("still applies when history is ignored", () => {
+			const result = draw(["Alice", "Bob"], {
+				couples: [["Alice", "Bob"]],
+				lookbackYears: 0,
+			});
+
+			expect(result).toEqual({ ok: false, reason: "no-valid-pairing" });
+		});
+
+		it("applies together with the rotation rule", () => {
+			// Two couples leave each person two possible receivers; last year
+			// used one of them, so exactly one arrangement remains.
+			const four = ["Alice", "Bob", "Carol", "Dan"];
+			const lastYear = [
+				entry(2025, "Alice", "Carol"),
+				entry(2025, "Carol", "Bob"),
+				entry(2025, "Bob", "Dan"),
+				entry(2025, "Dan", "Alice"),
+			];
+
+			for (const seed of SEEDS.slice(0, 50)) {
+				const drawn = assignmentsOf(
+					draw(four, { couples, history: lastYear, seed }),
+				);
+				expect(pairs(drawn)).toEqual([
+					"Alice>Dan",
+					"Bob>Carol",
+					"Carol>Alice",
+					"Dan>Bob",
+				]);
+			}
+		});
+
+		it("reports no valid pairing when a couple leaves someone stuck", () => {
+			// With three people, whoever draws the single person leaves the
+			// other partner nobody but their own partner.
+			const result = draw(["Alice", "Bob", "Carol"], {
+				couples: [["Alice", "Bob"]],
+			});
+
+			expect(result).toEqual({ ok: false, reason: "no-valid-pairing" });
+		});
+
+		it("ignores couples involving people who are not taking part", () => {
+			const strangers: Couple[] = [
+				["Alice", "Zed"],
+				["Yan", "Xavier"],
+			];
+
+			expect(draw(["Alice", "Bob"], { couples: strangers }).ok).toBe(true);
 		});
 	});
 
