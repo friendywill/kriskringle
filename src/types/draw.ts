@@ -1,4 +1,5 @@
 import type { Couple } from "./couples";
+import type { Family } from "./families";
 import type { HistoryEntry } from "./history";
 
 /** Returns a float in [0, 1), like `Math.random`. */
@@ -29,3 +30,24 @@ export type DrawFailureReason =
 export type DrawResult =
 	| { ok: true; assignments: Assignment[] }
 	| { ok: false; reason: DrawFailureReason };
+
+export type KidsDrawInput = {
+	/** Everyone on the people list. Each buys for a child where they can. */
+	adults: readonly string[];
+	families: readonly Family[];
+	/** Past kids' presents: adult gave to child. */
+	history: readonly HistoryEntry[];
+	/** The year being drawn. Only earlier years count as "bought before". */
+	year: number;
+	rng: Rng;
+};
+
+export type KidsDrawResult =
+	| { ok: true; assignments: Assignment[] }
+	| { ok: false; reason: "no-kids" | "no-adults" }
+	| {
+			ok: false;
+			reason: "kids-without-giver";
+			/** Children every adult is a parent of, so nobody may buy for. */
+			kids: string[];
+	  };
