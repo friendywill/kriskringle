@@ -1,0 +1,12 @@
+# Keep the build context small and free of local state.
+.git
+node_modules
+dist
+coverage
+.tanstack
+.env
+.env.*
+!.env.example
+*.md
+Dockerfile
+.dockerignore

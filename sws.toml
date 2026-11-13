@@ -1,0 +1,26 @@
+# static-web-server configuration for the runtime container.
+# Options: https://static-web-server.net
+
+[general]
+root = "/public"
+
+# Client-side routes (/history) have no file on disk. Serve the app shell
+# with a 200 so they resolve on direct navigation and refresh.
+page-fallback = "/public/index.html"
+
+[advanced]
+
+# Header rules are applied in order and a later match overrides an earlier
+# one, so the general rule comes first.
+
+# The app shell must always be revalidated, or browsers keep pointing at
+# asset files from a previous deploy.
+[[advanced.headers]]
+source = "/**"
+headers = { Cache-Control = "no-cache" }
+
+# Vite puts a content hash in every filename under /assets, so those files
+# never change and can be cached for good.
+[[advanced.headers]]
+source = "/assets/**"
+headers = { Cache-Control = "public, max-age=31536000, immutable" }
