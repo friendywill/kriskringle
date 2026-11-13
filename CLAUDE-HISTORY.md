@@ -142,3 +142,70 @@ a new branch, `feat/people-list-and-couples`, as two commits.
 - `wrap-break-words` in `HistoryEditor.tsx` (a change made outside this
   session) produces no CSS. Tailwind's utility is `wrap-break-word`. Left as
   it was.
+
+---
+
+## 2026-11-14 — Session 1, prompt 3
+
+### Prompt
+
+> Great work, lets move on to another feature I would like, which is to add a
+> kids list, not for the kids to buy for each other, but rather for each
+> adult to buy for a kid in another family. So, each mother and father will
+> get presents for their kids regardless of this kris kringle, so we need to
+> come up with a list of families with kids and their parents, so that we can
+> avoid adding a parent buying for their own child, but they will be added to
+> buy for a child outside their family, and preferable not a child they have
+> bought for in the past
+
+### Response
+
+Built on branch `feat/kids-presents` (from `master`), in four commits.
+
+**Families**
+
+- New **Kids** page (`/kids`). A family is created from its kids' names;
+  parents are then picked from the people list. A child belongs to one
+  family; an adult may be a parent in more than one (blended families).
+- A family with no parents set is allowed: any adult may buy for those kids.
+- Removing a family's last child removes the family. Removing someone from
+  the people list drops them as a parent but keeps their kids.
+- Stored under `kk:v1:families`.
+
+**The kids' draw** (`src/lib/kidsDraw.ts`)
+
+- Every adult on the people list buys for one child. Never their own child:
+  that is the only hard rule.
+- Then, in order: every child gets a present if there are enough adults who
+  aren't their parents; presents are spread as evenly as possible (5 adults,
+  4 kids → one child gets two); and nobody buys for a child they bought for
+  in an earlier year.
+- Avoiding repeats is a preference, as asked. A repeat is only made when
+  avoiding it would leave a child or adult out or make the spread less even,
+  and the page names who repeated.
+- Kids left without a present, or adults with no child to buy for, are
+  named on the page instead of failing the draw.
+- Kids' history is stored separately (`kk:v1:kids-history`), so the adults'
+  rotation and the kids' rotation don't affect each other.
+
+**History page**
+
+- Now has two editors: Kris Kringle and Kids' presents. In the kids editor,
+  givers must be on the people list and receivers must be kids in a family.
+
+**Verification**
+
+- 279 tests pass; lint and typecheck clean.
+- Production build driven in headless Edge: 40 draws never gave a parent
+  their own child and always reached all four kids; after saving, 25
+  next-year draws repeated no adult–child pairing; kids' history saved
+  apart from adults'; a non-kid receiver flagged in the kids editor;
+  removing a person from the list removed them as a parent; no sideways
+  scroll at 360px; no console errors.
+
+**Open questions for the user**
+
+- Couples are not considered in the kids' draw, so two partners can draw the
+  same child. Easy to prevent if wanted.
+- Every adult buys for a child. If some adults should sit the kids' draw
+  out, that needs an opt-out per person.
