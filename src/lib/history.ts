@@ -18,6 +18,10 @@ import { cleanName, nameKey } from "./utils";
  *
  * Bullets, numbering, emoji and blank lines are ignored. Anything else that
  * cannot be read is reported with its line number — never silently dropped.
+ *
+ * Every name must be on the people list. That is what catches "Will" when
+ * the list says "William": history under a second spelling would not count
+ * against the person it belongs to, and the draw could repeat a pairing.
  */
 
 /** A standalone four-digit year, 1900–2099. */
@@ -66,10 +70,19 @@ function splitPair(text: string): Assignment | null {
  * Parses pasted or hand-edited history text. Input is untrusted: every row
  * is validated, and each unreadable line produces an error instead of being
  * dropped, so the caller can show the user exactly what needs fixing.
+ *
+ * Only names on `people` are accepted, matched ignoring case and spacing.
+ * Entries come back in the list's spelling; names that are not on the list
+ * are reported as errors and collected in `unknownNames`.
  */
-export function parseHistory(text: string): HistoryParseResult {
+export function parseHistory(
+	text: string,
+	people: readonly string[],
+): HistoryParseResult {
 	const entries: HistoryEntry[] = [];
 	const errors: HistoryParseError[] = [];
+	const listed = new Map(people.map((name) => [nameKey(name), name]));
+	const unknown = new Map<string, string>();
 	const seenGivers = new Set<string>();
 	let year: number | null = null;
 
@@ -109,11 +122,25 @@ export function parseHistory(text: string): HistoryParseResult {
 			report(`Names must be 1–${MAX_NAME_LENGTH} characters long.`);
 			continue;
 		}
-		const { giver, receiver } = entry.data;
-		if (nameKey(giver) === nameKey(receiver)) {
-			report(`${giver} cannot give to themselves.`);
+		if (nameKey(entry.data.giver) === nameKey(entry.data.receiver)) {
+			report(`${entry.data.giver} cannot give to themselves.`);
 			continue;
 		}
+
+		const strangers = [entry.data.giver, entry.data.receiver].filter(
+			(name) => !listed.has(nameKey(name)),
+		);
+		if (strangers.length > 0) {
+			for (const name of strangers) unknown.set(nameKey(name), name);
+			report(`Not on the people list: ${strangers.join(", ")}.`);
+			continue;
+		}
+
+		// Keep the list's spelling, so "alice" in a chat is saved as "Alice".
+		const giver = listed.get(nameKey(entry.data.giver)) ?? entry.data.giver;
+		const receiver =
+			listed.get(nameKey(entry.data.receiver)) ?? entry.data.receiver;
+
 		const giverKey = `${year}\u0000${nameKey(giver)}`;
 		if (seenGivers.has(giverKey)) {
 			report(`${giver} already has a pairing in ${year}.`);
@@ -121,13 +148,13 @@ export function parseHistory(text: string): HistoryParseResult {
 		}
 
 		seenGivers.add(giverKey);
-		entries.push(entry.data);
+		entries.push({ year, giver, receiver });
 	}
 
-	return { entries, errors };
+	return { entries, errors, unknownNames: [...unknown.values()] };
 }
 
-/** Removes the lines that `parseHistory` reported as unreadable. */
+/** Removes the lines that `parseHistory` reported as errors. */
 export function dropErrorLines(
 	text: string,
 	errors: readonly HistoryParseError[],

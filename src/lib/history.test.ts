@@ -9,26 +9,36 @@ import {
 	serialiseHistory,
 } from "./history";
 
+const PEOPLE = ["Alice", "Bob", "Carol", "Dan", "Erin"];
+
+/** Parses against the usual people list unless a test supplies its own. */
+function parse(text: string, people: readonly string[] = PEOPLE) {
+	return parseHistory(text, people);
+}
+
 function entry(year: number, giver: string, receiver: string): HistoryEntry {
 	return { year, giver, receiver };
 }
 
 describe("parseHistory", () => {
 	it("returns nothing for empty or blank text", () => {
-		expect(parseHistory("")).toEqual({ entries: [], errors: [] });
-		expect(parseHistory("  \n\n\t\n")).toEqual({ entries: [], errors: [] });
+		const nothing = { entries: [], errors: [], unknownNames: [] };
+
+		expect(parse("")).toEqual(nothing);
+		expect(parse("  \n\n\t\n")).toEqual(nothing);
 	});
 
 	it("reads years and pairings in the canonical format", () => {
 		const text = "2025\nAlice -> Bob\nBob -> Alice\n\n2024\nAlice -> Carol";
 
-		expect(parseHistory(text)).toEqual({
+		expect(parse(text)).toEqual({
 			entries: [
 				entry(2025, "Alice", "Bob"),
 				entry(2025, "Bob", "Alice"),
 				entry(2024, "Alice", "Carol"),
 			],
 			errors: [],
+			unknownNames: [],
 		});
 	});
 
@@ -45,7 +55,7 @@ describe("parseHistory", () => {
 			"🎁🎁🎁",
 		].join("\r\n");
 
-		expect(parseHistory(message)).toEqual({
+		expect(parse(message)).toEqual({
 			entries: [
 				entry(2024, "Alice", "Bob"),
 				entry(2024, "Bob", "Carol"),
@@ -54,6 +64,7 @@ describe("parseHistory", () => {
 				entry(2024, "Erin", "Alice"),
 			],
 			errors: [],
+			unknownNames: [],
 		});
 	});
 
@@ -77,12 +88,11 @@ describe("parseHistory", () => {
 		["Alice drew Bob"],
 		["ALICE GIVES TO BOB"],
 	])("reads the pairing %j", (line) => {
-		const { entries, errors } = parseHistory(`2024\n${line}`);
-
-		expect(errors).toEqual([]);
-		expect(entries).toHaveLength(1);
-		expect(entries[0]?.giver.toLowerCase()).toBe("alice");
-		expect(entries[0]?.receiver.toLowerCase()).toBe("bob");
+		expect(parse(`2024\n${line}`)).toEqual({
+			entries: [entry(2024, "Alice", "Bob")],
+			errors: [],
+			unknownNames: [],
+		});
 	});
 
 	it.each([
@@ -92,43 +102,121 @@ describe("parseHistory", () => {
 		["**KK 2023 — Christmas at Mum's**"],
 		["Year: 2023"],
 	])("treats %j as the heading for 2023", (heading) => {
-		expect(parseHistory(`${heading}\nAlice -> Bob`)).toEqual({
-			entries: [entry(2023, "Alice", "Bob")],
-			errors: [],
-		});
+		expect(parse(`${heading}\nAlice -> Bob`).entries).toEqual([
+			entry(2023, "Alice", "Bob"),
+		]);
 	});
 
 	it("reads a pairing written on the same line as its year", () => {
 		const text = "2022: Alice -> Bob\nCarol -> Dan (2021)";
 
-		expect(parseHistory(text)).toEqual({
-			entries: [entry(2022, "Alice", "Bob"), entry(2021, "Carol", "Dan")],
-			errors: [],
-		});
+		expect(parse(text).entries).toEqual([
+			entry(2022, "Alice", "Bob"),
+			entry(2021, "Carol", "Dan"),
+		]);
 	});
 
 	it("strips decoration but keeps real name punctuation", () => {
+		const people = ["Mary-Anne O'Neil", "Bob (uncle)", "José María", "Zoë"];
 		const text = [
 			"2024",
 			"**@Mary-Anne O'Neil** -> Bob (uncle) 🎁",
 			"1. José   María => Zoë.",
 		].join("\n");
 
-		expect(parseHistory(text).entries).toEqual([
-			entry(2024, "Mary-Anne O'Neil", "Bob (uncle)"),
-			entry(2024, "José María", "Zoë"),
-		]);
+		expect(parse(text, people)).toEqual({
+			entries: [
+				entry(2024, "Mary-Anne O'Neil", "Bob (uncle)"),
+				entry(2024, "José María", "Zoë"),
+			],
+			errors: [],
+			unknownNames: [],
+		});
 	});
 
 	it("merges a year that appears in more than one block", () => {
 		const text =
 			"2024\nAlice -> Bob\n\n2023\nAlice -> Carol\n\n2024\nBob -> Alice";
 
-		expect(parseHistory(text).entries).toEqual([
+		expect(parse(text).entries).toEqual([
 			entry(2024, "Alice", "Bob"),
 			entry(2023, "Alice", "Carol"),
 			entry(2024, "Bob", "Alice"),
 		]);
+	});
+
+	describe("people list", () => {
+		it("rejects a nickname of someone who is on the list", () => {
+			const people = ["William", "Sarah"];
+
+			const result = parse("2024\nWill -> Sarah\nSarah -> William", people);
+
+			expect(result).toEqual({
+				entries: [entry(2024, "Sarah", "William")],
+				errors: [
+					{
+						line: 2,
+						text: "Will -> Sarah",
+						message: "Not on the people list: Will.",
+					},
+				],
+				unknownNames: ["Will"],
+			});
+		});
+
+		it("accepts the nickname once it has been added to the list", () => {
+			const people = ["William", "Sarah", "Will"];
+
+			const result = parse("2024\nWill -> Sarah", people);
+
+			expect(result.errors).toEqual([]);
+			expect(result.entries).toEqual([entry(2024, "Will", "Sarah")]);
+		});
+
+		it("rejects an unknown receiver as well as an unknown giver", () => {
+			const { entries, errors, unknownNames } = parse(
+				"2024\nAlice -> Zed\nYan -> Xavier",
+			);
+
+			expect(entries).toEqual([]);
+			expect(errors.map((error) => error.message)).toEqual([
+				"Not on the people list: Zed.",
+				"Not on the people list: Yan, Xavier.",
+			]);
+			expect(unknownNames).toEqual(["Zed", "Yan", "Xavier"]);
+		});
+
+		it("lists each unknown name once, however often it appears", () => {
+			const text = "2024\nZed -> Alice\nBob -> ZED\n2023\nzed -> Bob";
+
+			const { errors, unknownNames } = parse(text);
+
+			expect(errors).toHaveLength(3);
+			expect(unknownNames).toHaveLength(1);
+		});
+
+		it("matches the list ignoring case and spacing, and keeps its spelling", () => {
+			const people = ["Mary Anne", "Bob"];
+
+			const result = parse("2024\nMARY   anne -> bob", people);
+
+			expect(result.errors).toEqual([]);
+			expect(result.entries).toEqual([entry(2024, "Mary Anne", "Bob")]);
+		});
+
+		it("rejects every pairing when the list is empty", () => {
+			const { entries, unknownNames } = parse("2024\nAlice -> Bob", []);
+
+			expect(entries).toEqual([]);
+			expect(unknownNames).toEqual(["Alice", "Bob"]);
+		});
+
+		it("does not report unknown names for lines that fail earlier checks", () => {
+			const { errors, unknownNames } = parse("Zed -> Yan\n2024\nZed -> zed");
+
+			expect(errors).toHaveLength(2);
+			expect(unknownNames).toEqual([]);
+		});
 	});
 
 	describe("malformed input", () => {
@@ -141,7 +229,7 @@ describe("parseHistory", () => {
 				"Bob -> Alice",
 			].join("\n");
 
-			const { entries, errors } = parseHistory(text);
+			const { entries, errors } = parse(text);
 
 			expect(entries).toEqual([
 				entry(2024, "Alice", "Bob"),
@@ -162,9 +250,7 @@ describe("parseHistory", () => {
 		});
 
 		it("reports pairings that come before any year", () => {
-			const { entries, errors } = parseHistory(
-				"Alice -> Bob\n2024\nBob -> Alice",
-			);
+			const { entries, errors } = parse("Alice -> Bob\n2024\nBob -> Alice");
 
 			expect(entries).toEqual([entry(2024, "Bob", "Alice")]);
 			expect(errors).toEqual([
@@ -179,7 +265,7 @@ describe("parseHistory", () => {
 		it.each([["Alice ->"], ["-> Bob"], ["Alice"], ["Alice Bob"]])(
 			"reports the incomplete pairing %j",
 			(line) => {
-				const { entries, errors } = parseHistory(`2024\n${line}`);
+				const { entries, errors } = parse(`2024\n${line}`);
 
 				expect(entries).toEqual([]);
 				expect(errors).toMatchObject([{ line: 2, text: line }]);
@@ -187,7 +273,7 @@ describe("parseHistory", () => {
 		);
 
 		it("reports someone giving to themselves", () => {
-			const { entries, errors } = parseHistory("2024\nAlice -> alice");
+			const { entries, errors } = parse("2024\nAlice -> alice");
 
 			expect(entries).toEqual([]);
 			expect(errors).toMatchObject([
@@ -198,21 +284,21 @@ describe("parseHistory", () => {
 		it("reports a giver listed twice in one year, but not across years", () => {
 			const text = "2024\nAlice -> Bob\nALICE -> Carol\n2023\nAlice -> Bob";
 
-			const { entries, errors } = parseHistory(text);
+			const { entries, errors } = parse(text);
 
 			expect(entries).toEqual([
 				entry(2024, "Alice", "Bob"),
 				entry(2023, "Alice", "Bob"),
 			]);
 			expect(errors).toMatchObject([
-				{ line: 3, message: "ALICE already has a pairing in 2024." },
+				{ line: 3, message: "Alice already has a pairing in 2024." },
 			]);
 		});
 
 		it("reports names that are too long", () => {
 			const long = "x".repeat(61);
 
-			const { entries, errors } = parseHistory(`2024\n${long} -> Bob`);
+			const { entries, errors } = parse(`2024\n${long} -> Bob`);
 
 			expect(entries).toEqual([]);
 			expect(errors).toMatchObject([
@@ -221,7 +307,7 @@ describe("parseHistory", () => {
 		});
 
 		it("does not mistake other numbers for a year", () => {
-			const { entries, errors } = parseHistory("12024\nAlice -> Bob");
+			const { entries, errors } = parse("12024\nAlice -> Bob");
 
 			expect(entries).toEqual([]);
 			expect(errors.map((error) => error.line)).toEqual([1, 2]);
@@ -230,13 +316,13 @@ describe("parseHistory", () => {
 });
 
 describe("dropErrorLines", () => {
-	it("removes only the lines that could not be read", () => {
-		const text = "2024\nhello there\nAlice -> Bob\nwhat is this\nBob -> Alice";
+	it("removes only the lines that have problems", () => {
+		const text = "2024\nhello there\nAlice -> Bob\nZed -> Alice\nBob -> Alice";
 
-		const cleaned = dropErrorLines(text, parseHistory(text).errors);
+		const cleaned = dropErrorLines(text, parse(text).errors);
 
 		expect(cleaned).toBe("2024\nAlice -> Bob\nBob -> Alice");
-		expect(parseHistory(cleaned).errors).toEqual([]);
+		expect(parse(cleaned).errors).toEqual([]);
 	});
 
 	it("returns the text unchanged when there are no errors", () => {
@@ -270,6 +356,7 @@ describe("groupByYear", () => {
 });
 
 describe("serialiseHistory", () => {
+	const people = ["Alice", "Bob", "Mary-Anne O'Neil", "Bob (uncle)"];
 	const entries = [
 		entry(2024, "Alice", "Bob"),
 		entry(2025, "Mary-Anne O'Neil", "Bob (uncle)"),
@@ -287,7 +374,7 @@ describe("serialiseHistory", () => {
 	});
 
 	it("round-trips through parseHistory", () => {
-		const reparsed = parseHistory(serialiseHistory(entries));
+		const reparsed = parse(serialiseHistory(entries), people);
 
 		expect(reparsed.errors).toEqual([]);
 		expect(groupByYear(reparsed.entries)).toEqual(groupByYear(entries));
@@ -333,9 +420,10 @@ describe("formatAnnouncement", () => {
 	});
 
 	it("can be pasted straight back into history", () => {
-		expect(parseHistory(formatAnnouncement(2026, assignments))).toEqual({
+		expect(parse(formatAnnouncement(2026, assignments))).toEqual({
 			entries: [entry(2026, "Alice", "Bob"), entry(2026, "Bob", "Alice")],
 			errors: [],
+			unknownNames: [],
 		});
 	});
 });

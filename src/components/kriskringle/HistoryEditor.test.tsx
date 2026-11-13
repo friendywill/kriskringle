@@ -1,13 +1,40 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { HistoryEntry } from "../../types/history";
 import { HistoryEditor } from "./HistoryEditor";
+
+const PEOPLE = ["Alice", "Bob", "Carol", "Dan"];
 
 const HISTORY: HistoryEntry[] = [
 	{ year: 2024, giver: "Alice", receiver: "Bob" },
 	{ year: 2024, giver: "Bob", receiver: "Alice" },
 ];
+
+type EditorProps = Parameters<typeof HistoryEditor>[0];
+
+/** Holds the people list in state, the way the route's loader data does. */
+function Harness({
+	history = [],
+	people = PEOPLE,
+	onSave = () => true,
+	onAddPeople = () => true,
+}: Partial<EditorProps>) {
+	const [list, setList] = useState(people);
+	return (
+		<HistoryEditor
+			history={history}
+			people={list}
+			onSave={onSave}
+			onAddPeople={(names) => {
+				const isSaved = onAddPeople(names);
+				if (isSaved) setList([...list, ...names]);
+				return isSaved;
+			}}
+		/>
+	);
+}
 
 function editor() {
 	return screen.getByLabelText("Past pairings");
@@ -29,7 +56,7 @@ async function pasteText(
 
 describe("HistoryEditor", () => {
 	it("shows saved history as editable text and as a table", () => {
-		render(<HistoryEditor history={HISTORY} onSave={() => true} />);
+		render(<Harness history={HISTORY} />);
 
 		expect(editor()).toHaveValue("2024\nAlice -> Bob\nBob -> Alice");
 		const table = screen.getByRole("table", {
@@ -40,7 +67,7 @@ describe("HistoryEditor", () => {
 	});
 
 	it("invites a paste when there is no history", () => {
-		render(<HistoryEditor history={[]} onSave={() => true} />);
+		render(<Harness />);
 
 		expect(editor()).toHaveValue("");
 		expect(screen.getByText(/no history yet/i)).toBeInTheDocument();
@@ -49,7 +76,7 @@ describe("HistoryEditor", () => {
 	it("previews and saves a pasted chat announcement", async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn(() => true);
-		render(<HistoryEditor history={[]} onSave={onSave} />);
+		render(<Harness onSave={onSave} />);
 
 		await pasteText(
 			user,
@@ -74,24 +101,24 @@ describe("HistoryEditor", () => {
 		expect(saveButton()).toBeDisabled();
 	});
 
-	it("lists unreadable lines and blocks saving until they are fixed", async () => {
+	it("lists problem lines and blocks saving until they are fixed", async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn(() => true);
-		render(<HistoryEditor history={[]} onSave={onSave} />);
+		render(<Harness onSave={onSave} />);
 
 		await pasteText(user, "2023\nhello everyone\nCarol -> Dan");
 
-		expect(screen.getByText(/1 line can't be read/i)).toBeInTheDocument();
+		expect(screen.getByText(/1 line has a problem/i)).toBeInTheDocument();
 		expect(screen.getByText(/line 2:/i)).toHaveTextContent("hello everyone");
 		expect(editor()).toBeInvalid();
 		expect(saveButton()).toBeDisabled();
 
 		await user.click(
-			screen.getByRole("button", { name: "Remove unreadable lines" }),
+			screen.getByRole("button", { name: "Remove these lines" }),
 		);
 
 		expect(editor()).toHaveValue("2023\nCarol -> Dan");
-		expect(screen.queryByText(/can't be read/i)).not.toBeInTheDocument();
+		expect(screen.queryByText(/has a problem/i)).not.toBeInTheDocument();
 
 		await user.click(saveButton());
 
@@ -100,11 +127,109 @@ describe("HistoryEditor", () => {
 		]);
 	});
 
+	describe("people list", () => {
+		it("flags a name that is not on the list and blocks saving", async () => {
+			const user = userEvent.setup();
+			render(<Harness people={["William", "Sarah"]} />);
+
+			await pasteText(user, "2023\nWill -> Sarah\nSarah -> William");
+
+			expect(screen.getByText(/line 2:/i)).toHaveTextContent(
+				"Not on the people list: Will.",
+			);
+			expect(editor()).toBeInvalid();
+			expect(saveButton()).toBeDisabled();
+			expect(
+				within(screen.getByRole("table")).queryByText("Will"),
+			).not.toBeInTheDocument();
+		});
+
+		it("accepts the name once it is added to the list", async () => {
+			const user = userEvent.setup();
+			const onAddPeople = vi.fn(() => true);
+			const onSave = vi.fn(() => true);
+			render(
+				<Harness
+					people={["William", "Sarah"]}
+					onAddPeople={onAddPeople}
+					onSave={onSave}
+				/>,
+			);
+			await pasteText(user, "2023\nWill -> Sarah");
+
+			await user.click(screen.getByRole("button", { name: "Add Will" }));
+
+			expect(onAddPeople).toHaveBeenCalledExactlyOnceWith(["Will"]);
+			expect(screen.queryByText(/has a problem/i)).not.toBeInTheDocument();
+			expect(editor()).toHaveValue("2023\nWill -> Sarah");
+
+			await user.click(saveButton());
+
+			expect(onSave).toHaveBeenCalledExactlyOnceWith([
+				{ year: 2023, giver: "Will", receiver: "Sarah" },
+			]);
+		});
+
+		it("offers to add several unknown names at once", async () => {
+			const user = userEvent.setup();
+			const onAddPeople = vi.fn(() => true);
+			render(<Harness people={[]} onAddPeople={onAddPeople} />);
+			await pasteText(user, "2023\nZed -> Yan\nYan -> Zed");
+
+			await user.click(screen.getByRole("button", { name: "Add all 2" }));
+
+			expect(onAddPeople).toHaveBeenCalledExactlyOnceWith(["Zed", "Yan"]);
+			expect(screen.queryByText(/have problems/i)).not.toBeInTheDocument();
+		});
+
+		it("does not offer to add names when the only problems are unreadable lines", async () => {
+			const user = userEvent.setup();
+			render(<Harness />);
+
+			await pasteText(user, "2023\nhello everyone");
+
+			expect(
+				screen.queryByRole("button", { name: /^Add / }),
+			).not.toBeInTheDocument();
+		});
+
+		it("flags saved history that names someone no longer on the list", () => {
+			render(<Harness history={HISTORY} people={["Alice"]} />);
+
+			expect(screen.getByText(/2 lines have problems/i)).toBeInTheDocument();
+			expect(screen.getByRole("button", { name: "Add Bob" })).toBeEnabled();
+		});
+
+		it("saves pasted names in the list's spelling", async () => {
+			const user = userEvent.setup();
+			const onSave = vi.fn(() => true);
+			render(<Harness onSave={onSave} />);
+			await pasteText(user, "2023\nCAROL -> dan");
+
+			await user.click(saveButton());
+
+			expect(onSave).toHaveBeenCalledExactlyOnceWith([
+				{ year: 2023, giver: "Carol", receiver: "Dan" },
+			]);
+		});
+
+		it("warns when a name could not be added to the list", async () => {
+			const user = userEvent.setup();
+			render(<Harness people={[]} onAddPeople={() => false} />);
+			await pasteText(user, "2023\nZed -> Yan");
+
+			await user.click(screen.getByRole("button", { name: "Add Zed" }));
+
+			expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i);
+			expect(screen.getByRole("button", { name: "Add Zed" })).toBeEnabled();
+		});
+	});
+
 	it("discards unsaved edits", async () => {
 		const user = userEvent.setup();
-		render(<HistoryEditor history={HISTORY} onSave={() => true} />);
+		render(<Harness history={HISTORY} />);
 
-		await pasteText(user, "2020\nZed -> Yan");
+		await pasteText(user, "2020\nCarol -> Dan");
 		await user.click(screen.getByRole("button", { name: "Discard changes" }));
 
 		expect(editor()).toHaveValue("2024\nAlice -> Bob\nBob -> Alice");
@@ -116,7 +241,7 @@ describe("HistoryEditor", () => {
 	it("can clear all history by saving an empty editor", async () => {
 		const user = userEvent.setup();
 		const onSave = vi.fn(() => true);
-		render(<HistoryEditor history={HISTORY} onSave={onSave} />);
+		render(<Harness history={HISTORY} onSave={onSave} />);
 
 		await user.clear(editor());
 		await user.click(saveButton());
@@ -126,7 +251,7 @@ describe("HistoryEditor", () => {
 
 	it("warns and keeps the edits when saving fails", async () => {
 		const user = userEvent.setup();
-		render(<HistoryEditor history={[]} onSave={() => false} />);
+		render(<Harness onSave={() => false} />);
 
 		await pasteText(user, "2023\nCarol -> Dan");
 		await user.click(saveButton());

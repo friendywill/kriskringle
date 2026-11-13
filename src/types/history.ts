@@ -33,6 +33,8 @@ export type HistoryParseError = {
 export type HistoryParseResult = {
 	entries: HistoryEntry[];
 	errors: HistoryParseError[];
+	/** Names found in the text that are not on the people list, once each. */
+	unknownNames: string[];
 };
 
 /** History entries for a single year, for display. */

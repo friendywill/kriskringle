@@ -15,13 +15,22 @@ import { StorageErrorAlert } from "./StorageErrorAlert";
 
 type HistoryEditorProps = {
 	history: readonly HistoryEntry[];
+	/** The people list. History may only name people who are on it. */
+	people: readonly string[];
 	/** Replaces the saved history and returns whether it was saved. */
 	onSave: (entries: HistoryEntry[]) => boolean;
+	/** Adds names to the people list and returns whether it was saved. */
+	onAddPeople: (names: string[]) => boolean;
 };
 
 type SaveStatus = "idle" | "saved" | "failed";
 
-export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
+export function HistoryEditor({
+	history,
+	people,
+	onSave,
+	onAddPeople,
+}: HistoryEditorProps) {
 	const [savedText, setSavedText] = useState(() => serialiseHistory(history));
 	const [text, setText] = useState(savedText);
 	const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -29,7 +38,7 @@ export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
 	const hintId = useId();
 	const errorsId = useId();
 
-	const { entries, errors } = parseHistory(text);
+	const { entries, errors, unknownNames } = parseHistory(text, people);
 	const years = groupByYear(entries);
 	const hasErrors = errors.length > 0;
 	const isDirty = text !== savedText;
@@ -50,6 +59,10 @@ export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
 		setText(tidied);
 		setSavedText(tidied);
 		setSaveStatus("saved");
+	};
+
+	const handleAddPeople = (names: string[]) => {
+		setSaveStatus(onAddPeople(names) ? "idle" : "failed");
 	};
 
 	return (
@@ -77,7 +90,8 @@ export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
 					Paste the announcement from your group chat, or type it in. Put the
 					year on its own line, then one pairing per line, giver first — for
 					example <code className="font-mono">Alice -&gt; Bob</code> or{" "}
-					<code className="font-mono">Alice gives to Bob</code>.
+					<code className="font-mono">Alice gives to Bob</code>. Names must
+					match the people list.
 				</p>
 
 				{hasErrors && (
@@ -85,8 +99,8 @@ export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
 						<div id={errorsId}>
 							<p className="font-semibold">
 								{errors.length === 1
-									? "1 line can't be read. Fix or remove it before saving."
-									: `${errors.length} lines can't be read. Fix or remove them before saving.`}
+									? "1 line has a problem. Fix or remove it before saving."
+									: `${errors.length} lines have problems. Fix or remove them before saving.`}
 							</p>
 							<ul className="mt-2 space-y-1">
 								{errors.map((error) => (
@@ -98,6 +112,33 @@ export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
 								))}
 							</ul>
 						</div>
+						{unknownNames.length > 0 && (
+							<div className="mt-3 space-y-2">
+								<p>
+									History can only name people on the list. If a name is a real
+									person and not a misspelling, add it:
+								</p>
+								<div className="flex flex-wrap gap-2">
+									{unknownNames.map((name) => (
+										<Button
+											key={name}
+											variant="secondary"
+											onClick={() => handleAddPeople([name])}
+										>
+											Add {name}
+										</Button>
+									))}
+									{unknownNames.length > 1 && (
+										<Button
+											variant="secondary"
+											onClick={() => handleAddPeople(unknownNames)}
+										>
+											Add all {unknownNames.length}
+										</Button>
+									)}
+								</div>
+							</div>
+						)}
 					</Alert>
 				)}
 
@@ -110,7 +151,7 @@ export function HistoryEditor({ history, onSave }: HistoryEditorProps) {
 							variant="secondary"
 							onClick={() => handleTextChange(dropErrorLines(text, errors))}
 						>
-							Remove unreadable lines
+							Remove these lines
 						</Button>
 					)}
 					{isDirty && (
