@@ -18,14 +18,18 @@ type EditorProps = Parameters<typeof HistoryEditor>[0];
 function Harness({
 	history = [],
 	people = PEOPLE,
+	kids,
 	onSave = () => true,
 	onAddPeople = () => true,
 }: Partial<EditorProps>) {
 	const [list, setList] = useState(people);
 	return (
 		<HistoryEditor
+			title="Kris Kringle"
+			fieldLabel="Past pairings"
 			history={history}
 			people={list}
+			{...(kids === undefined ? {} : { kids })}
 			onSave={onSave}
 			onAddPeople={(names) => {
 				const isSaved = onAddPeople(names);
@@ -221,6 +225,41 @@ describe("HistoryEditor", () => {
 			await user.click(screen.getByRole("button", { name: "Add Zed" }));
 
 			expect(screen.getByRole("alert")).toHaveTextContent(/couldn't save/i);
+			expect(screen.getByRole("button", { name: "Add Zed" })).toBeEnabled();
+		});
+	});
+
+	describe("kids' presents", () => {
+		it("takes receivers from the kids list and givers from the people list", async () => {
+			const user = userEvent.setup();
+			const onSave = vi.fn(() => true);
+			render(<Harness kids={["Tom", "Max"]} onSave={onSave} />);
+
+			await pasteText(user, "Kids' presents 2025\nAlice -> Tom\nBob -> Carol");
+
+			expect(screen.getByText(/line 3:/i)).toHaveTextContent(
+				"Not a kid in any family: Carol.",
+			);
+			expect(
+				screen.queryByRole("button", { name: /^Add / }),
+			).not.toBeInTheDocument();
+
+			await user.click(
+				screen.getByRole("button", { name: "Remove these lines" }),
+			);
+			await user.click(saveButton());
+
+			expect(onSave).toHaveBeenCalledExactlyOnceWith([
+				{ year: 2025, giver: "Alice", receiver: "Tom" },
+			]);
+		});
+
+		it("offers to add an unknown giver to the people list", async () => {
+			const user = userEvent.setup();
+			render(<Harness kids={["Tom"]} />);
+
+			await pasteText(user, "2025\nZed -> Tom");
+
 			expect(screen.getByRole("button", { name: "Add Zed" })).toBeEnabled();
 		});
 	});

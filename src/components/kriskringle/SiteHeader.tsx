@@ -15,6 +15,9 @@ export function SiteHeader() {
 				<Link to="/" activeOptions={{ exact: true }} className={NAV_LINK_CLASS}>
 					Draw
 				</Link>
+				<Link to="/kids" className={NAV_LINK_CLASS}>
+					Kids
+				</Link>
 				<Link to="/history" className={NAV_LINK_CLASS}>
 					History
 				</Link>

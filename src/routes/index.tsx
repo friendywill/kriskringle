@@ -1,12 +1,15 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { DrawPanel } from "../components/kriskringle/DrawPanel";
 import { pruneCouples } from "../lib/couples";
+import { pruneParents } from "../lib/families";
 import { replaceYear } from "../lib/history";
 import {
 	loadCouples,
+	loadFamilies,
 	loadHistory,
 	loadParticipants,
 	saveCouples,
+	saveFamilies,
 	saveHistory,
 	saveParticipants,
 } from "../lib/storage";
@@ -18,18 +21,22 @@ export const Route = createFileRoute("/")({
 		participants: loadParticipants(),
 		history: loadHistory(),
 		couples: loadCouples(),
+		families: loadFamilies(),
 	}),
 	component: DrawRoute,
 });
 
 function DrawRoute() {
-	const { participants, history, couples } = Route.useLoaderData();
+	const { participants, history, couples, families } = Route.useLoaderData();
 	const router = useRouter();
 
 	const handleParticipantsChange = (next: string[]) => {
-		// Someone leaving the list ends their couple as well.
+		// Someone leaving the list ends their couple and stops being a parent
+		// in the kids' draw; their kids stay for the other adults.
 		const isSaved =
-			saveParticipants(next) && saveCouples(pruneCouples(couples, next));
+			saveParticipants(next) &&
+			saveCouples(pruneCouples(couples, next)) &&
+			saveFamilies(pruneParents(families, next));
 		void router.invalidate();
 		return isSaved;
 	};

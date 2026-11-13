@@ -5,6 +5,7 @@ import {
 	addKids,
 	addParent,
 	allKids,
+	familyLabel,
 	pruneParents,
 	removeFamily,
 	removeKid,
@@ -62,6 +63,10 @@ describe("removeKid", () => {
 			{ parents: ["Anna", "Ben"], kids: ["Lily"] },
 		]);
 	});
+
+	it("removes the family along with its last child", () => {
+		expect(removeKid([SMITHS, JONES], 1, "Max")).toEqual([SMITHS]);
+	});
 });
 
 describe("addParent", () => {
@@ -107,5 +112,17 @@ describe("pruneParents", () => {
 			{ parents: ["Ben"], kids: ["Tom", "Lily"] },
 			{ parents: [], kids: ["Max"] },
 		]);
+	});
+});
+
+describe("familyLabel", () => {
+	it("names a family by its kids", () => {
+		expect(familyLabel(SMITHS)).toBe("Family of Tom, Lily");
+	});
+
+	it("handles a family with no kids", () => {
+		expect(familyLabel({ parents: ["Anna"], kids: [] })).toBe(
+			"Family with no kids",
+		);
 	});
 });

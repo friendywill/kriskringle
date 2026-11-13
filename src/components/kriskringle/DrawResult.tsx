@@ -8,6 +8,8 @@ import { AssignmentTable } from "./AssignmentTable";
 import { StorageErrorAlert } from "./StorageErrorAlert";
 
 type DrawResultProps = {
+	/** Names the draw in the heading and the chat message. */
+	heading?: string;
 	year: number;
 	assignments: readonly Assignment[];
 	/** History already holds this year, so saving overwrites it. */
@@ -20,6 +22,7 @@ type SaveStatus = "unsaved" | "saved" | "failed";
 type CopyStatus = "idle" | "copied" | "failed";
 
 export function DrawResult({
+	heading = "Kris Kringle",
 	year,
 	assignments,
 	isReplacing,
@@ -35,7 +38,7 @@ export function DrawResult({
 	const handleCopy = async () => {
 		try {
 			await navigator.clipboard.writeText(
-				formatAnnouncement(year, assignments),
+				formatAnnouncement(year, assignments, heading),
 			);
 			setCopyStatus("copied");
 		} catch {
@@ -44,7 +47,7 @@ export function DrawResult({
 	};
 
 	return (
-		<Card title={`Kris Kringle ${year}`}>
+		<Card title={`${heading} ${year}`}>
 			<AssignmentTable
 				caption={`Who gives to whom in ${year}`}
 				assignments={assignments}

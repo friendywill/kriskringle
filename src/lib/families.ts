@@ -1,6 +1,13 @@
 import type { AddKidsResult, Family } from "../types/families";
 import { addParticipants, nameKey } from "./utils";
 
+/** A family's display name, built from its kids so no extra naming is needed. */
+export function familyLabel(family: Family): string {
+	return family.kids.length === 0
+		? "Family with no kids"
+		: `Family of ${family.kids.join(", ")}`;
+}
+
 /** Every child across all families, in family order. */
 export function allKids(families: readonly Family[]): string[] {
 	return families.flatMap((family) => family.kids);
@@ -55,15 +62,19 @@ export function addKids(
 	};
 }
 
+/** Removes a child; a family left with no kids is removed with them. */
 export function removeKid(
 	families: readonly Family[],
 	index: number,
 	kid: string,
 ): Family[] {
-	return updateFamily(families, index, (family) => ({
+	const updated = updateFamily(families, index, (family) => ({
 		...family,
 		kids: family.kids.filter((name) => nameKey(name) !== nameKey(kid)),
 	}));
+	return updated.filter(
+		(family, position) => position !== index || family.kids.length > 0,
+	);
 }
 
 /** Adds a parent to the family at `index`, unless already one of them. */
