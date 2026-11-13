@@ -75,3 +75,70 @@ and built a working first version. Nothing was committed.
 - A stray temp folder was left at
   `C:\Users\friendywill\AppData\Local\Temp\tmp.QZh1siCVTT` (one generated
   `tsconfig.json`); a safety check blocked its removal.
+
+---
+
+## 2026-11-14 — Session 1, prompt 2
+
+### Prompt
+
+> Okay, start committing, we will start on some more logic for this. I would
+> like to ensure data validility, where only people who are on a list can be
+> added to this history. So if William is on the list, Will will show up as
+> invalid unless added to this list. Another task to get started on, is to
+> ensure that the couples do not buy for each other in this kris kringle as
+> they will already get each other gifts. This means, we need to have a list
+> that shows couples, and use that logic so that couples never buy for each
+> other.
+
+### Response
+
+Committed the existing work as five commits on `master` (the repository had
+no history, so there was nothing to branch from), then built both features on
+a new branch, `feat/people-list-and-couples`, as two commits.
+
+**History only accepts people on the list**
+
+- "The list" is the existing people list on the Draw page.
+- `parseHistory(text, people)` now rejects any pairing naming someone who is
+  not on it: with William listed, `Will -> Sarah` is an error
+  ("Not on the people list: Will.") and saving is blocked.
+- Names match ignoring case and spacing and are saved in the list's
+  spelling, so `sarah -> CAROL` is stored as `Sarah -> Carol`.
+- The History page offers "Add Will" (and "Add all N") beside the errors, so
+  a real person can be added without leaving the page and losing pasted
+  text.
+- History already saved that names someone later removed from the list shows
+  as invalid the next time the History page is opened.
+
+**Couples never buy for each other**
+
+- New "Couples" card on the Draw page: pick two people, add the couple,
+  remove it with ×. A person can be in one couple only.
+- Stored under `kk:v1:couples` as pairs of names, Zod-validated like the
+  rest.
+- The draw blocks both directions for every couple. Unlike the history rule
+  this is never relaxed, including with "ignore history" selected.
+- Removing a person from the list also removes their couple.
+- If the couples make a draw impossible (for example three people, two of
+  them a couple) the page says so instead of drawing.
+
+**Verification**
+
+- 215 tests pass; `bun run lint` and `bun run typecheck` are clean;
+  `src/lib/` remains at 100% line coverage.
+- The production build was driven in headless Edge: 40 draws with two
+  couples never paired a couple; removing a person removed their couple; a
+  pasted history with `Will` and `Bobby` was flagged and blocked; "Add Will"
+  cleared his error and kept the pasted text; saved history used the list's
+  spelling; no console errors.
+
+**Things flagged to the user**
+
+- Because there is one list, removing someone who has left the family draw
+  makes their old history rows invalid. The draw already ignores history
+  about people who are not taking part, so nothing is lost by deleting those
+  rows, but a separate "known people" roster would avoid it if wanted.
+- `wrap-break-words` in `HistoryEditor.tsx` (a change made outside this
+  session) produces no CSS. Tailwind's utility is `wrap-break-word`. Left as
+  it was.
